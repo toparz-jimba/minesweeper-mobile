@@ -6,6 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Minesweeper game project built as a Progressive Web App (PWA). The core game is built with HTML/CSS/JavaScript and can be installed on smartphones and PCs as a standalone app without any app store.
 
+### Recent Updates (2025-07-30)
+- Added advanced probability calculation system using Constraint Satisfaction Problem (CSP) algorithms
+- Implemented three probability assistance features:
+  - **Hint System**: Shows optimal moves with detailed calculation explanations
+  - **Statistics Mode**: Real-time probability overlay on game board
+  - **Probability Analysis View**: Full board probability visualization in a popup modal
+- All probability calculations consider multiple constraints simultaneously for accurate results
+
 ## Core Architecture
 
 ### Core Files
@@ -72,12 +80,26 @@ git push -u origin main
 5. **Extreme Difficulty**: 64×64 grid with 999 mines, requires special CSS handling
 6. **PWA Support**: Installable as standalone app with offline functionality
 7. **Service Worker**: Caches all game assets for offline play
+8. **Hint System (ヒント機能)**: 
+   - Shows cells with lowest mine probability with detailed calculation explanation
+   - CSP-based probability calculation considering multiple constraints
+   - Displays calculation process showing why specific probability was determined
+9. **Statistics Mode (統計モード)**: 
+   - Real-time probability display on all unrevealed cells
+   - Toggle mode to see mine probabilities while playing
+   - Uses advanced CSP algorithm for accurate multi-constraint calculations
+10. **Probability Analysis View (確率分析ビュー)**: 
+   - Full board duplicate showing all cell probabilities at once
+   - Color-coded visualization (green=safe, red=mine, gradient for probabilities)
+   - Popup modal for comprehensive probability overview
 
 ### Performance Considerations
 - DOM manipulation is optimized for the 64×64 extreme difficulty
 - Zoom uses CSS transforms for performance
 - Event delegation reduces listener count
 - Cell size dynamically adjusts based on difficulty
+- CSP probability calculations limited to groups of 20 cells or less to maintain performance
+- Advanced probability calculations use constraint grouping to reduce computational complexity
 
 ### Important Functions
 - `placeMines(excludeRow, excludeCol)`: Mine placement with first-click exclusion
@@ -85,6 +107,11 @@ git push -u origin main
 - `handleDoubleClick()`: Implements chord functionality
 - `updateZoom()`: Manages zoom state and dynamic padding
 - `createGameBoardWrapper()`: Creates scroll container for zoom functionality
+- `calculateAdvancedProbabilities()`: CSP-based probability calculation with constraint grouping
+- `showHint()`: Displays hint with detailed calculation explanation
+- `toggleStatsMode()`: Toggles real-time probability display on cells
+- `showProbabilityView()`: Shows full board probability analysis
+- `getDetailedProbabilityCalculation()`: Generates detailed explanation of probability calculations
 
 ## Code Style Guidelines
 
@@ -117,6 +144,10 @@ The project doesn't have formal tests, but when making changes:
 6. Verify PWA installation on different browsers
 7. Test offline functionality after caching
 8. Check Service Worker updates work correctly
+9. Test hint system with various board configurations
+10. Verify probability calculations are accurate with CSP algorithm
+11. Test statistics mode toggle and probability display updates
+12. Check probability analysis view with different difficulty levels
 
 ## Important Notes
 

@@ -1035,7 +1035,7 @@ class Minesweeper {
             }
         }
         
-        if (!targetGroup || targetGroup.unknownCells.size > 10) {
+        if (!targetGroup || targetGroup.unknownCells.size > 15) {
             return null; // グループが大きすぎる場合は簡易表示
         }
         
@@ -1076,9 +1076,9 @@ class Minesweeper {
         explanation += `このマスが爆弾である配置: ${mineCount}通り\n`;
         explanation += `確率計算: ${mineCount}/${validConfigurations.length} = ${Math.round(probability * 100)}%`;
         
-        // 配置パターンの例を表示（最大5つ）
-        if (validConfigurations.length <= 5) {
-            explanation += `\n\n【全ての有効な配置】\n`;
+        // 配置パターンの表示（最大10個、または全て表示可能な場合は全て）
+        if (validConfigurations.length <= 10) {
+            explanation += `\n\n【${validConfigurations.length <= 5 ? '全ての' : ''}有効な配置】\n`;
             validConfigurations.forEach((config, idx) => {
                 explanation += `パターン${idx + 1}: `;
                 const pattern = cellArray.map((cell, i) => {
@@ -1087,6 +1087,18 @@ class Minesweeper {
                 }).join(' ');
                 explanation += pattern + '\n';
             });
+        } else {
+            // 配置パターンが多い場合は一部のみ表示
+            explanation += `\n\n【有効な配置の例（${validConfigurations.length}通り中10個）】\n`;
+            for (let idx = 0; idx < 10; idx++) {
+                const config = validConfigurations[idx];
+                explanation += `パターン${idx + 1}: `;
+                const pattern = cellArray.map((cell, i) => {
+                    const [r, c] = cell.split(',').map(Number);
+                    return `(${r + 1},${c + 1})=${config[i] ? '💣' : '✓'}`;
+                }).join(' ');
+                explanation += pattern + '\n';
+            }
         }
         
         return explanation;
@@ -1147,8 +1159,10 @@ class Minesweeper {
             }
         }
         
-        // メッセージ表示
-        this.showStatsModeMessage('📊 統計モード: 各マスの爆弾確率を表示中');
+        // メッセージ表示（ヒント計算メッセージが表示されていない場合のみ）
+        if (!this.gameMessage.classList.contains('with-calculation')) {
+            this.showStatsModeMessage('📊 統計モード: 各マスの爆弾確率を表示中');
+        }
     }
     
     // 統計モードをクリア
