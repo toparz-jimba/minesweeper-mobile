@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マインスイーパー</title>
+    
+    <!-- PWA関連のメタタグ -->
+    <meta name="theme-color" content="#3498db">
+    <meta name="description" content="クラシックなマインスイーパーゲーム。初級から極悪まで4つの難易度で楽しめます。">
+    
+    <!-- iOS対応 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="地雷探し">
+    <link rel="apple-touch-icon" href="icons/icon-152x152.png">
+    
+    <!-- PWAマニフェスト -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- アイコン -->
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-72x72.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="icons/icon-72x72.png">
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="game-header">
+            <h1>🚩 マインスイーパー</h1>
+            <div class="game-info">
+                <div class="info-panel">
+                    <span class="label">地雷数:</span>
+                    <span id="mine-count" class="count">10</span>
+                </div>
+                <button id="reset-btn" class="reset-button">🔄 リセット</button>
+                <div class="info-panel">
+                    <span class="label">タイマー:</span>
+                    <span id="timer" class="count">000</span>
+                </div>
+            </div>
+        </header>
+        
+        <main class="game-area">
+            <div id="game-board" class="game-board"></div>
+            <div id="game-message" class="game-message hidden"></div>
+        </main>
+        
+        <footer class="controls">
+            <div class="difficulty-selector">
+                <label>難易度:</label>
+                <select id="difficulty">
+                    <option value="easy">初級 (9x9, 10地雷)</option>
+                    <option value="medium">中級 (16x16, 40地雷)</option>
+                    <option value="hard">上級 (16x30, 99地雷)</option>
+                    <option value="extreme">🔥 極悪 (64x64, 999地雷)</option>
+                </select>
+            </div>
+            <div class="zoom-controls">
+                <label>拡大縮小:</label>
+                <button id="zoom-in" class="zoom-button">🔍+</button>
+                <span id="zoom-level" class="zoom-level">100%</span>
+                <button id="zoom-out" class="zoom-button">🔍−</button>
+                <button id="zoom-reset" class="zoom-button">📐</button>
+            </div>
+            <div class="instructions">
+                <p>左クリック: セルを開く | 右クリック: フラグを立てる | ダブルクリック: 数字セルの隣接セルを一括展開</p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+    
+    <!-- Service Worker登録 -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker登録成功:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('Service Worker登録失敗:', error);
+                    });
+            });
+        }
+    </script>
+</body>
+</html> 

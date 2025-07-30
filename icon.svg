@@ -1,0 +1,28 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景 -->
+  <rect width="512" height="512" fill="#3498db" rx="80"/>
+  
+  <!-- グリッドパターン -->
+  <g stroke="#2980b9" stroke-width="2" fill="none">
+    <line x1="128" y1="0" x2="128" y2="512"/>
+    <line x1="256" y1="0" x2="256" y2="512"/>
+    <line x1="384" y1="0" x2="384" y2="512"/>
+    <line x1="0" y1="128" x2="512" y2="128"/>
+    <line x1="0" y1="256" x2="512" y2="256"/>
+    <line x1="0" y1="384" x2="512" y2="384"/>
+  </g>
+  
+  <!-- 地雷 -->
+  <g fill="#2c3e50">
+    <!-- 地雷本体 -->
+    <circle cx="256" cy="256" r="60"/>
+    <!-- トゲ -->
+    <rect x="246" y="156" width="20" height="200" rx="10"/>
+    <rect x="156" y="246" width="200" height="20" rx="10"/>
+    <rect x="202" y="202" width="108" height="20" rx="10" transform="rotate(45 256 256)"/>
+    <rect x="202" y="290" width="108" height="20" rx="10" transform="rotate(-45 256 256)"/>
+  </g>
+  
+  <!-- ハイライト -->
+  <circle cx="240" cy="240" r="15" fill="#34495e" opacity="0.6"/>
+</svg>
