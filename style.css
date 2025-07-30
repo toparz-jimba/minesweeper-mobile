@@ -384,6 +384,13 @@ body {
     color: white;
 }
 
+.game-message.hint.with-calculation {
+    font-size: 1.1rem;
+    padding: 20px 30px;
+    white-space: pre-line;
+    line-height: 1.6;
+}
+
 /* 統計モード表示 */
 .cell.stats-mode::after {
     content: attr(data-probability);

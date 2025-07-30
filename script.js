@@ -595,6 +595,7 @@ class Minesweeper {
         const config = this.difficulties[this.currentDifficulty];
         let bestCells = [];
         let bestType = null; // 'mine' or 'safe'
+        let calculationExplanation = []; // 計算式の説明
         
         // 確定爆弾を探す（確率1.0）
         for (let row = 0; row < config.rows; row++) {
@@ -604,6 +605,19 @@ class Minesweeper {
                     !this.board[row][col].isRevealed) {
                     bestCells.push({row, col});
                     bestType = 'mine';
+                    
+                    // この確定爆弾がどのような制約から導かれたか調べる
+                    const adjacentConstraints = this.findAdjacentConstraints(row, col, config);
+                    for (const constraint of adjacentConstraints) {
+                        if (constraint.unknownCells.length === constraint.remainingMines) {
+                            calculationExplanation.push({
+                                type: 'certain_mine',
+                                cell: {row, col},
+                                reason: `数字${constraint.requiredMines}の周囲に未開封${constraint.unknownCells.length}マス、残り爆弾${constraint.remainingMines}個 → 全て爆弾確定`
+                            });
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -616,6 +630,19 @@ class Minesweeper {
                         !this.board[row][col].isRevealed) {
                         bestCells.push({row, col});
                         bestType = 'safe';
+                        
+                        // この確定安全がどのような制約から導かれたか調べる
+                        const adjacentConstraints = this.findAdjacentConstraints(row, col, config);
+                        for (const constraint of adjacentConstraints) {
+                            if (constraint.remainingMines === 0) {
+                                calculationExplanation.push({
+                                    type: 'certain_safe',
+                                    cell: {row, col},
+                                    reason: `数字${constraint.requiredMines}の周囲で既に${constraint.flaggedCount}個フラグ設置済み → 残り全て安全`
+                                });
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -669,6 +696,26 @@ class Minesweeper {
                     }
                 }
             }
+            
+            // 最低確率セルの計算式を説明
+            if (bestCells.length > 0) {
+                const bestCell = bestCells[0];
+                const adjacentConstraints = this.findAdjacentConstraints(bestCell.row, bestCell.col, config);
+                const constraintExplanations = [];
+                
+                for (const constraint of adjacentConstraints) {
+                    const probability = constraint.remainingMines / constraint.unknownCells.length;
+                    constraintExplanations.push(`数字${constraint.requiredMines}から: ${constraint.remainingMines}個/${constraint.unknownCells.length}マス = ${Math.round(probability * 100)}%`);
+                }
+                
+                calculationExplanation.push({
+                    type: 'lowest_probability',
+                    cell: bestCell,
+                    probability: minProbability,
+                    reason: constraintExplanations.join('、')
+                });
+            }
+            
             bestType = 'safe';
         }
         
@@ -684,14 +731,27 @@ class Minesweeper {
                 });
             }
             
-            // メッセージ表示
-            if (bestType === 'mine') {
-                this.showHintMessage('💡 赤く光っているマスは爆弾が確定しています！');
-            } else if (this.probabilities[bestCells[0].row][bestCells[0].col] === 0) {
-                this.showHintMessage('💡 緑に光っているマスは安全です！');
+            // メッセージ表示（計算式付き）
+            if (calculationExplanation.length > 0) {
+                const explanation = calculationExplanation[0];
+                if (bestType === 'mine') {
+                    this.showHintMessageWithCalculation('💡 赤く光っているマスは爆弾が確定しています！', explanation.reason);
+                } else if (this.probabilities[bestCells[0].row][bestCells[0].col] === 0) {
+                    this.showHintMessageWithCalculation('💡 緑に光っているマスは安全です！', explanation.reason);
+                } else {
+                    const probability = Math.round(this.probabilities[bestCells[0].row][bestCells[0].col] * 100);
+                    this.showHintMessageWithCalculation(`💡 緑に光っているマスは爆弾確率が最も低いです（${probability}%）`, explanation.reason);
+                }
             } else {
-                const probability = Math.round(this.probabilities[bestCells[0].row][bestCells[0].col] * 100);
-                this.showHintMessage(`💡 緑に光っているマスは爆弾確率が最も低いです（${probability}%）`);
+                // 計算式がない場合は通常のメッセージ
+                if (bestType === 'mine') {
+                    this.showHintMessage('💡 赤く光っているマスは爆弾が確定しています！');
+                } else if (this.probabilities[bestCells[0].row][bestCells[0].col] === 0) {
+                    this.showHintMessage('💡 緑に光っているマスは安全です！');
+                } else {
+                    const probability = Math.round(this.probabilities[bestCells[0].row][bestCells[0].col] * 100);
+                    this.showHintMessage(`💡 緑に光っているマスは爆弾確率が最も低いです（${probability}%）`);
+                }
             }
         } else {
             this.showHintMessage('💡 ヒントが見つかりませんでした');
@@ -700,23 +760,62 @@ class Minesweeper {
     
     // ヒントメッセージ表示
     showHintMessage(message) {
-        const originalMessage = this.gameMessage.textContent;
-        const originalClass = this.gameMessage.className;
-        const wasHidden = this.gameMessage.classList.contains('hidden');
-        
         this.gameMessage.textContent = message;
         this.gameMessage.className = 'game-message hint';
         this.gameMessage.classList.remove('hidden');
+    }
+    
+    // 計算式付きヒントメッセージ表示
+    showHintMessageWithCalculation(message, calculation) {
+        // メッセージと計算式を組み合わせる
+        const fullMessage = `${message}\n計算式: ${calculation}`;
+        this.gameMessage.textContent = fullMessage;
+        this.gameMessage.className = 'game-message hint with-calculation';
+        this.gameMessage.classList.remove('hidden');
+    }
+    
+    // 特定のセルに隣接する制約を見つける
+    findAdjacentConstraints(targetRow, targetCol, config) {
+        const constraints = [];
         
-        // 3秒後に元に戻す
-        setTimeout(() => {
-            if (wasHidden) {
-                this.gameMessage.classList.add('hidden');
-            } else {
-                this.gameMessage.textContent = originalMessage;
-                this.gameMessage.className = originalClass;
+        // 周囲の開かれた数字セルを探す
+        for (let row = Math.max(0, targetRow - 1); row <= Math.min(config.rows - 1, targetRow + 1); row++) {
+            for (let col = Math.max(0, targetCol - 1); col <= Math.min(config.cols - 1, targetCol + 1); col++) {
+                const cell = this.board[row][col];
+                if (cell.isRevealed && !cell.isMine && cell.neighborMines > 0) {
+                    const constraint = {
+                        row: row,
+                        col: col,
+                        requiredMines: cell.neighborMines,
+                        unknownCells: [],
+                        flaggedCount: 0
+                    };
+                    
+                    // この数字セルの周囲を調査
+                    for (let r = Math.max(0, row - 1); r <= Math.min(config.rows - 1, row + 1); r++) {
+                        for (let c = Math.max(0, col - 1); c <= Math.min(config.cols - 1, col + 1); c++) {
+                            if (r !== row || c !== col) {
+                                const neighborCell = this.board[r][c];
+                                if (!neighborCell.isRevealed && !neighborCell.isFlagged) {
+                                    constraint.unknownCells.push({row: r, col: c});
+                                } else if (neighborCell.isFlagged) {
+                                    constraint.flaggedCount++;
+                                }
+                            }
+                        }
+                    }
+                    
+                    constraint.remainingMines = constraint.requiredMines - constraint.flaggedCount;
+                    
+                    // ターゲットセルがこの制約に含まれているか確認
+                    if (constraint.unknownCells.some(cell => cell.row === targetRow && cell.col === targetCol)) {
+                        constraints.push(constraint);
+                    }
+                }
             }
-        }, 3000);
+        }
+        
+        return constraints;
     }
     
     // ヒントハイライトをクリア
@@ -798,23 +897,9 @@ class Minesweeper {
     
     // 統計モードメッセージ表示
     showStatsModeMessage(message) {
-        const originalMessage = this.gameMessage.textContent;
-        const originalClass = this.gameMessage.className;
-        const wasHidden = this.gameMessage.classList.contains('hidden');
-        
         this.gameMessage.textContent = message;
         this.gameMessage.className = 'game-message hint';
         this.gameMessage.classList.remove('hidden');
-        
-        // 2秒後に元に戻す
-        setTimeout(() => {
-            if (wasHidden && !this.statsMode) {
-                this.gameMessage.classList.add('hidden');
-            } else if (!this.statsMode) {
-                this.gameMessage.textContent = originalMessage;
-                this.gameMessage.className = originalClass;
-            }
-        }, 2000);
     }
     
     // セルの状態が変化したときに統計モードを更新
