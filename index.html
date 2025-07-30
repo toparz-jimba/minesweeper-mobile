@@ -44,6 +44,11 @@
         <main class="game-area">
             <div id="game-board" class="game-board"></div>
             <div id="game-message" class="game-message hidden"></div>
+            <div id="probability-view" class="probability-view hidden">
+                <h3>確率分析ビュー</h3>
+                <div id="probability-board" class="probability-board"></div>
+                <button id="close-probability-view" class="close-button">✕ 閉じる</button>
+            </div>
         </main>
         
         <footer class="controls">
@@ -69,6 +74,7 @@
             <div class="hint-controls">
                 <button id="hint-btn" class="hint-button">💡 ヒント</button>
                 <button id="stats-btn" class="stats-button">📊 統計モード</button>
+                <button id="probability-btn" class="probability-button">🎯 確率分析</button>
             </div>
             <div class="instructions">
                 <p>左クリック: セルを開く | 右クリック: フラグを立てる | ダブルクリック: 数字セルの隣接セルを一括展開</p>

@@ -336,6 +336,28 @@ body {
     box-shadow: 0 0 20px rgba(108, 92, 231, 0.6);
 }
 
+.probability-button {
+    padding: 12px 24px;
+    border: 2px solid #00b894;
+    border-radius: 25px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    background: linear-gradient(135deg, #00b894 0%, #00a085 100%);
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.probability-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 184, 148, 0.4);
+}
+
+.probability-button:active {
+    transform: translateY(0);
+}
+
 /* ヒント表示用のハイライト */
 .cell.hint-mine {
     animation: pulse-red 1s ease-in-out infinite;
@@ -414,6 +436,127 @@ body {
     font-size: 0.9rem;
     color: #666;
     text-align: center;
+}
+
+/* 確率分析ビュー */
+.probability-view {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    max-height: 90vh;
+    overflow-y: auto;
+    min-width: 300px;
+}
+
+.probability-view h3 {
+    text-align: center;
+    color: #333;
+    margin-bottom: 20px;
+    font-size: 1.5rem;
+}
+
+.probability-board {
+    display: grid;
+    gap: 1px;
+    padding: 10px;
+    background: #999;
+    border-radius: 10px;
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1);
+    width: fit-content;
+    margin: 0 auto;
+}
+
+.probability-cell {
+    width: 40px;
+    height: 40px;
+    background: #e0e0e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 12px;
+    position: relative;
+    border: 1px solid #ccc;
+}
+
+.probability-cell.revealed {
+    background: #fff;
+}
+
+.probability-cell.flagged {
+    background: #ffd93d;
+}
+
+.probability-cell.probability-0 {
+    background: #4CAF50;
+    color: white;
+}
+
+.probability-cell.probability-low {
+    background: #8BC34A;
+}
+
+.probability-cell.probability-medium {
+    background: #FFC107;
+}
+
+.probability-cell.probability-high {
+    background: #FF9800;
+}
+
+.probability-cell.probability-100 {
+    background: #F44336;
+    color: white;
+}
+
+.probability-cell .cell-content {
+    font-size: 16px;
+}
+
+.probability-cell .probability-text {
+    font-size: 11px;
+    font-weight: normal;
+}
+
+/* 極悪難易度用の小さなセル */
+.probability-board[style*="20px"] .probability-cell {
+    width: 20px;
+    height: 20px;
+    font-size: 8px;
+}
+
+.probability-board[style*="20px"] .probability-cell .cell-content {
+    font-size: 10px;
+}
+
+.probability-board[style*="20px"] .probability-cell .probability-text {
+    font-size: 7px;
+}
+
+.close-button {
+    display: block;
+    margin: 20px auto 0;
+    padding: 10px 20px;
+    background: #f44336;
+    color: white;
+    border: none;
+    border-radius: 25px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.close-button:hover {
+    background: #d32f2f;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(244, 67, 54, 0.4);
 }
 
 @keyframes slideIn {

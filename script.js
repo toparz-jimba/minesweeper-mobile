@@ -12,6 +12,10 @@ class Minesweeper {
         this.zoomLevelDisplay = document.getElementById('zoom-level');
         this.hintButton = document.getElementById('hint-btn');
         this.statsButton = document.getElementById('stats-btn');
+        this.probabilityButton = document.getElementById('probability-btn');
+        this.probabilityView = document.getElementById('probability-view');
+        this.probabilityBoard = document.getElementById('probability-board');
+        this.closeProbabilityButton = document.getElementById('close-probability-view');
         
         // ゲームボードラッパーを作成
         this.createGameBoardWrapper();
@@ -81,6 +85,10 @@ class Minesweeper {
         
         // 統計モードボタンのイベントリスナー
         this.statsButton.addEventListener('click', () => this.toggleStatsMode());
+        
+        // 確率分析ボタンのイベントリスナー
+        this.probabilityButton.addEventListener('click', () => this.showProbabilityView());
+        this.closeProbabilityButton.addEventListener('click', () => this.hideProbabilityView());
     }
     
     newGame() {
@@ -1173,6 +1181,81 @@ class Minesweeper {
         if (this.statsMode) {
             this.showStatsMode();
         }
+    }
+    
+    // 確率分析ビューを表示
+    showProbabilityView() {
+        if (this.gameState !== 'playing' || this.firstClick) {
+            return;
+        }
+        
+        // 高度な確率を計算
+        this.calculateAdvancedProbabilities();
+        
+        const config = this.difficulties[this.currentDifficulty];
+        this.probabilityBoard.innerHTML = '';
+        
+        // セルサイズを設定
+        const cellSize = this.currentDifficulty === 'extreme' ? '20px' : '40px';
+        this.probabilityBoard.style.gridTemplateColumns = `repeat(${config.cols}, ${cellSize})`;
+        this.probabilityBoard.style.gridTemplateRows = `repeat(${config.rows}, ${cellSize})`;
+        
+        // 盤面を複製して確率を表示
+        for (let row = 0; row < config.rows; row++) {
+            for (let col = 0; col < config.cols; col++) {
+                const cell = this.board[row][col];
+                const cellDiv = document.createElement('div');
+                cellDiv.className = 'probability-cell';
+                
+                if (cell.isRevealed) {
+                    cellDiv.classList.add('revealed');
+                    if (!cell.isMine && cell.neighborMines > 0) {
+                        const content = document.createElement('div');
+                        content.className = 'cell-content';
+                        content.textContent = cell.neighborMines;
+                        content.classList.add(`number-${cell.neighborMines}`);
+                        cellDiv.appendChild(content);
+                    }
+                } else if (cell.isFlagged) {
+                    cellDiv.classList.add('flagged');
+                    cellDiv.textContent = '🚩';
+                } else {
+                    // 未開封セルの確率を表示
+                    const probability = this.probabilities[row][col];
+                    if (probability >= 0) {
+                        const percentage = Math.round(probability * 100);
+                        
+                        // 確率に応じて色分け
+                        if (probability === 0) {
+                            cellDiv.classList.add('probability-0');
+                        } else if (probability === 1) {
+                            cellDiv.classList.add('probability-100');
+                        } else if (probability < 0.25) {
+                            cellDiv.classList.add('probability-low');
+                        } else if (probability < 0.5) {
+                            cellDiv.classList.add('probability-medium');
+                        } else {
+                            cellDiv.classList.add('probability-high');
+                        }
+                        
+                        const probText = document.createElement('div');
+                        probText.className = 'probability-text';
+                        probText.textContent = `${percentage}%`;
+                        cellDiv.appendChild(probText);
+                    }
+                }
+                
+                this.probabilityBoard.appendChild(cellDiv);
+            }
+        }
+        
+        // ビューを表示
+        this.probabilityView.classList.remove('hidden');
+    }
+    
+    // 確率分析ビューを非表示
+    hideProbabilityView() {
+        this.probabilityView.classList.add('hidden');
     }
 }
 
