@@ -121,6 +121,7 @@ body {
     cursor: pointer;
     transition: all 0.2s ease;
     user-select: none;
+    position: relative;
 }
 
 .cell:hover {
@@ -278,6 +279,128 @@ body {
 .game-board-container {
     transform-origin: center center;
     transition: transform 0.2s ease;
+}
+
+.hint-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.hint-button {
+    padding: 12px 24px;
+    border: 2px solid #4facfe;
+    border-radius: 25px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.hint-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
+}
+
+.hint-button:active {
+    transform: translateY(0);
+}
+
+.stats-button {
+    padding: 12px 24px;
+    border: 2px solid #a29bfe;
+    border-radius: 25px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    background: linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%);
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.stats-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(162, 155, 254, 0.4);
+}
+
+.stats-button:active {
+    transform: translateY(0);
+}
+
+.stats-button.active {
+    background: linear-gradient(135deg, #6c5ce7 0%, #5f3dc4 100%);
+    box-shadow: 0 0 20px rgba(108, 92, 231, 0.6);
+}
+
+/* ヒント表示用のハイライト */
+.cell.hint-mine {
+    animation: pulse-red 1s ease-in-out infinite;
+    box-shadow: 0 0 10px rgba(255, 107, 107, 0.8);
+    border: 2px solid #ff6b6b;
+}
+
+.cell.hint-safe {
+    animation: pulse-green 1s ease-in-out infinite;
+    box-shadow: 0 0 10px rgba(0, 184, 148, 0.8);
+    border: 2px solid #00b894;
+}
+
+@keyframes pulse-red {
+    0% {
+        background: #ff6b6b;
+        transform: scale(1);
+    }
+    50% {
+        background: #ff8787;
+        transform: scale(1.05);
+    }
+    100% {
+        background: #ff6b6b;
+        transform: scale(1);
+    }
+}
+
+@keyframes pulse-green {
+    0% {
+        background: #00b894;
+        transform: scale(1);
+    }
+    50% {
+        background: #00d4aa;
+        transform: scale(1.05);
+    }
+    100% {
+        background: #00b894;
+        transform: scale(1);
+    }
+}
+
+.game-message.hint {
+    background: linear-gradient(145deg, #4facfe, #00f2fe);
+    color: white;
+}
+
+/* 統計モード表示 */
+.cell.stats-mode::after {
+    content: attr(data-probability);
+    position: absolute;
+    font-size: 8px;
+    font-weight: bold;
+    color: #333;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 1px 3px;
+    border-radius: 3px;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.game-board[style*="15px"] .cell.stats-mode::after {
+    font-size: 6px;
+    padding: 0px 2px;
 }
 
 .instructions {
