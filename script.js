@@ -589,8 +589,8 @@ class Minesweeper {
         // 前のヒントハイライトをクリア
         this.clearHintHighlight();
         
-        // 確率を計算
-        this.calculateProbabilities();
+        // 高度な確率を計算
+        this.calculateAdvancedProbabilities();
         
         const config = this.difficulties[this.currentDifficulty];
         let bestCells = [];
@@ -703,17 +703,30 @@ class Minesweeper {
                 const adjacentConstraints = this.findAdjacentConstraints(bestCell.row, bestCell.col, config);
                 const constraintExplanations = [];
                 
-                for (const constraint of adjacentConstraints) {
-                    const probability = constraint.remainingMines / constraint.unknownCells.length;
-                    constraintExplanations.push(`数字${constraint.requiredMines}から: ${constraint.remainingMines}個/${constraint.unknownCells.length}マス = ${Math.round(probability * 100)}%`);
-                }
+                // CSPベースの詳細な計算過程を取得
+                const detailedCalculation = this.getDetailedProbabilityCalculation(bestCell.row, bestCell.col, config);
                 
-                calculationExplanation.push({
-                    type: 'lowest_probability',
-                    cell: bestCell,
-                    probability: minProbability,
-                    reason: constraintExplanations.join('、')
-                });
+                if (detailedCalculation) {
+                    calculationExplanation.push({
+                        type: 'lowest_probability_detailed',
+                        cell: bestCell,
+                        probability: minProbability,
+                        reason: detailedCalculation
+                    });
+                } else {
+                    // 簡易的な説明
+                    for (const constraint of adjacentConstraints) {
+                        const probability = constraint.remainingMines / constraint.unknownCells.length;
+                        constraintExplanations.push(`数字${constraint.requiredMines}から: ${constraint.remainingMines}個/${constraint.unknownCells.length}マス = ${Math.round(probability * 100)}%`);
+                    }
+                    
+                    calculationExplanation.push({
+                        type: 'lowest_probability',
+                        cell: bestCell,
+                        probability: minProbability,
+                        reason: constraintExplanations.join('、')
+                    });
+                }
             }
             
             bestType = 'safe';
@@ -740,7 +753,11 @@ class Minesweeper {
                     this.showHintMessageWithCalculation('💡 緑に光っているマスは安全です！', explanation.reason);
                 } else {
                     const probability = Math.round(this.probabilities[bestCells[0].row][bestCells[0].col] * 100);
-                    this.showHintMessageWithCalculation(`💡 緑に光っているマスは爆弾確率が最も低いです（${probability}%）`, explanation.reason);
+                    if (explanation.type === 'lowest_probability_detailed') {
+                        this.showHintMessageWithCalculation(`💡 緑に光っているマスは爆弾確率が最も低いです（${probability}%）`, explanation.reason);
+                    } else {
+                        this.showHintMessageWithCalculation(`💡 緑に光っているマスは爆弾確率が最も低いです（${probability}%）`, explanation.reason);
+                    }
                 }
             } else {
                 // 計算式がない場合は通常のメッセージ
@@ -818,6 +835,255 @@ class Minesweeper {
         return constraints;
     }
     
+    // CSPベースの高度な確率計算
+    calculateAdvancedProbabilities() {
+        const config = this.difficulties[this.currentDifficulty];
+        this.calculateProbabilities(); // まず基本的な確率計算を実行
+        
+        // 制約のグループを特定
+        const constraintGroups = this.findConstraintGroups(config);
+        
+        // 各グループについて可能な配置を列挙
+        for (const group of constraintGroups) {
+            if (group.unknownCells.size <= 20) { // 計算量を抑えるため
+                const probabilities = this.calculateGroupProbabilities(group, config);
+                
+                // グループの確率を更新
+                for (const [cellKey, probability] of probabilities) {
+                    const [row, col] = cellKey.split(',').map(Number);
+                    this.probabilities[row][col] = probability;
+                }
+            }
+        }
+    }
+    
+    // 制約のグループを見つける（相互に影響し合う制約をグループ化）
+    findConstraintGroups(config) {
+        const groups = [];
+        const visited = new Set();
+        
+        // 全ての数字セルから制約を作成
+        const allConstraints = [];
+        for (let row = 0; row < config.rows; row++) {
+            for (let col = 0; col < config.cols; col++) {
+                const cell = this.board[row][col];
+                if (cell.isRevealed && !cell.isMine && cell.neighborMines > 0) {
+                    const constraint = this.createConstraint(row, col, config);
+                    if (constraint.unknownCells.length > 0) {
+                        allConstraints.push(constraint);
+                    }
+                }
+            }
+        }
+        
+        // 制約をグループ化
+        for (const constraint of allConstraints) {
+            const constraintKey = `${constraint.row},${constraint.col}`;
+            if (!visited.has(constraintKey)) {
+                const group = this.findConnectedConstraints(constraint, allConstraints, visited);
+                groups.push(group);
+            }
+        }
+        
+        return groups;
+    }
+    
+    // 接続された制約を見つける（DFS）
+    findConnectedConstraints(startConstraint, allConstraints, visited) {
+        const group = {
+            constraints: [],
+            unknownCells: new Set()
+        };
+        
+        const stack = [startConstraint];
+        
+        while (stack.length > 0) {
+            const current = stack.pop();
+            const key = `${current.row},${current.col}`;
+            
+            if (visited.has(key)) continue;
+            visited.add(key);
+            
+            group.constraints.push(current);
+            current.unknownCells.forEach(cell => {
+                group.unknownCells.add(`${cell.row},${cell.col}`);
+            });
+            
+            // 共通の未開封セルを持つ制約を探す
+            for (const other of allConstraints) {
+                const otherKey = `${other.row},${other.col}`;
+                if (!visited.has(otherKey)) {
+                    const hasCommonCell = current.unknownCells.some(cell1 =>
+                        other.unknownCells.some(cell2 => 
+                            cell1.row === cell2.row && cell1.col === cell2.col
+                        )
+                    );
+                    if (hasCommonCell) {
+                        stack.push(other);
+                    }
+                }
+            }
+        }
+        
+        return group;
+    }
+    
+    // 制約を作成
+    createConstraint(row, col, config) {
+        const constraint = {
+            row: row,
+            col: col,
+            requiredMines: this.board[row][col].neighborMines,
+            unknownCells: [],
+            flaggedCount: 0
+        };
+        
+        // 周囲のセルを調査
+        for (let r = Math.max(0, row - 1); r <= Math.min(config.rows - 1, row + 1); r++) {
+            for (let c = Math.max(0, col - 1); c <= Math.min(config.cols - 1, col + 1); c++) {
+                if (r !== row || c !== col) {
+                    const neighborCell = this.board[r][c];
+                    if (!neighborCell.isRevealed && !neighborCell.isFlagged) {
+                        constraint.unknownCells.push({row: r, col: c});
+                    } else if (neighborCell.isFlagged) {
+                        constraint.flaggedCount++;
+                    }
+                }
+            }
+        }
+        
+        constraint.remainingMines = constraint.requiredMines - constraint.flaggedCount;
+        return constraint;
+    }
+    
+    // グループ内の確率を計算（全ての可能な配置を列挙）
+    calculateGroupProbabilities(group, config) {
+        const cellArray = Array.from(group.unknownCells);
+        const validConfigurations = [];
+        const cellCount = cellArray.length;
+        
+        // 2^n の全ての組み合わせを試す（nが大きい場合は制限）
+        const maxConfigurations = Math.pow(2, cellCount);
+        for (let i = 0; i < maxConfigurations; i++) {
+            const configuration = [];
+            for (let j = 0; j < cellCount; j++) {
+                configuration.push((i >> j) & 1);
+            }
+            
+            // この配置が全ての制約を満たすか確認
+            if (this.isValidConfiguration(configuration, cellArray, group.constraints)) {
+                validConfigurations.push(configuration);
+            }
+        }
+        
+        // 各セルの確率を計算
+        const probabilities = new Map();
+        if (validConfigurations.length > 0) {
+            for (let i = 0; i < cellCount; i++) {
+                const cellKey = cellArray[i];
+                const mineCount = validConfigurations.reduce((sum, config) => sum + config[i], 0);
+                probabilities.set(cellKey, mineCount / validConfigurations.length);
+            }
+        }
+        
+        return probabilities;
+    }
+    
+    // 配置が全ての制約を満たすか確認
+    isValidConfiguration(configuration, cellArray, constraints) {
+        const cellMap = new Map();
+        for (let i = 0; i < cellArray.length; i++) {
+            cellMap.set(cellArray[i], configuration[i]);
+        }
+        
+        for (const constraint of constraints) {
+            let mineCount = 0;
+            for (const cell of constraint.unknownCells) {
+                const cellKey = `${cell.row},${cell.col}`;
+                if (cellMap.has(cellKey)) {
+                    mineCount += cellMap.get(cellKey);
+                }
+            }
+            
+            if (mineCount !== constraint.remainingMines) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    // 詳細な確率計算過程を取得
+    getDetailedProbabilityCalculation(targetRow, targetCol, config) {
+        // ターゲットセルを含む制約グループを見つける
+        const constraintGroups = this.findConstraintGroups(config);
+        let targetGroup = null;
+        const targetKey = `${targetRow},${targetCol}`;
+        
+        for (const group of constraintGroups) {
+            if (group.unknownCells.has(targetKey)) {
+                targetGroup = group;
+                break;
+            }
+        }
+        
+        if (!targetGroup || targetGroup.unknownCells.size > 10) {
+            return null; // グループが大きすぎる場合は簡易表示
+        }
+        
+        // 可能な配置を列挙
+        const cellArray = Array.from(targetGroup.unknownCells);
+        const validConfigurations = [];
+        const cellCount = cellArray.length;
+        
+        const maxConfigurations = Math.pow(2, cellCount);
+        for (let i = 0; i < maxConfigurations; i++) {
+            const configuration = [];
+            for (let j = 0; j < cellCount; j++) {
+                configuration.push((i >> j) & 1);
+            }
+            
+            if (this.isValidConfiguration(configuration, cellArray, targetGroup.constraints)) {
+                validConfigurations.push(configuration);
+            }
+        }
+        
+        // ターゲットセルのインデックスを見つける
+        const targetIndex = cellArray.indexOf(targetKey);
+        const mineCount = validConfigurations.reduce((sum, config) => sum + config[targetIndex], 0);
+        const probability = mineCount / validConfigurations.length;
+        
+        // 詳細な説明を作成
+        let explanation = `【詳細計算過程】\n`;
+        explanation += `関連する制約:\n`;
+        
+        // 各制約を説明
+        for (const constraint of targetGroup.constraints) {
+            const cell = this.board[constraint.row][constraint.col];
+            explanation += `・(${constraint.row + 1}, ${constraint.col + 1})の数字${cell.neighborMines}: `;
+            explanation += `未開封${constraint.unknownCells.length}マスに爆弾${constraint.remainingMines}個\n`;
+        }
+        
+        explanation += `\n制約を満たす配置パターン: ${validConfigurations.length}通り\n`;
+        explanation += `このマスが爆弾である配置: ${mineCount}通り\n`;
+        explanation += `確率計算: ${mineCount}/${validConfigurations.length} = ${Math.round(probability * 100)}%`;
+        
+        // 配置パターンの例を表示（最大5つ）
+        if (validConfigurations.length <= 5) {
+            explanation += `\n\n【全ての有効な配置】\n`;
+            validConfigurations.forEach((config, idx) => {
+                explanation += `パターン${idx + 1}: `;
+                const pattern = cellArray.map((cell, i) => {
+                    const [r, c] = cell.split(',').map(Number);
+                    return `(${r + 1},${c + 1})=${config[i] ? '💣' : '✓'}`;
+                }).join(' ');
+                explanation += pattern + '\n';
+            });
+        }
+        
+        return explanation;
+    }
+    
     // ヒントハイライトをクリア
     clearHintHighlight() {
         if (!this.board || this.board.length === 0) {
@@ -852,8 +1118,8 @@ class Minesweeper {
     
     // 統計モード表示
     showStatsMode() {
-        // 確率を計算
-        this.calculateProbabilities();
+        // 高度な確率を計算
+        this.calculateAdvancedProbabilities();
         
         const config = this.difficulties[this.currentDifficulty];
         
