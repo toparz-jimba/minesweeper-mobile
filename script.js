@@ -18,7 +18,10 @@ class Minesweeper {
             easy: { rows: 9, cols: 9, mines: 10 },
             medium: { rows: 16, cols: 16, mines: 40 },
             hard: { rows: 16, cols: 30, mines: 99 },
-            extreme: { rows: 64, cols: 64, mines: 999 }
+            extreme: { rows: 64, cols: 64, mines: 999 },
+            easyBack: { rows: 9, cols: 9, mines: 20 },
+            mediumBack: { rows: 16, cols: 16, mines: 64 },
+            hardBack: { rows: 16, cols: 30, mines: 120 }
         };
         
         this.currentDifficulty = 'easy';
