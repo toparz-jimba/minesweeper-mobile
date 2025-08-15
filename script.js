@@ -483,9 +483,31 @@ class Minesweeper {
                 touch2.clientY - touch1.clientY
             );
             
+            // ピンチの中心点を計算
+            const centerX = (touch1.clientX + touch2.clientX) / 2;
+            const centerY = (touch1.clientY + touch2.clientY) / 2;
+            
             if (this.lastTouchDistance > 0) {
                 const scaleDelta = currentDistance / this.lastTouchDistance;
-                this.scale = Math.max(0.5, Math.min(3, this.scale * scaleDelta));
+                const newScale = Math.max(0.5, Math.min(3, this.scale * scaleDelta));
+                
+                // ズーム中心を基準に位置を調整
+                if (newScale !== this.scale) {
+                    const scaleRatio = newScale / this.scale;
+                    const viewport = document.querySelector('.board-viewport');
+                    const viewportRect = viewport.getBoundingClientRect();
+                    
+                    // ビューポートの中心からピンチ中心への相対位置
+                    const offsetX = centerX - viewportRect.left - viewportRect.width / 2;
+                    const offsetY = centerY - viewportRect.top - viewportRect.height / 2;
+                    
+                    // 位置を調整（ズームの中心点を維持）
+                    this.translateX = this.translateX * scaleRatio - offsetX * (scaleRatio - 1);
+                    this.translateY = this.translateY * scaleRatio - offsetY * (scaleRatio - 1);
+                    
+                    this.scale = newScale;
+                }
+                
                 this.updateTransform();
             }
             
@@ -511,6 +533,22 @@ class Minesweeper {
     
     updateTransform() {
         const gameBoard = document.getElementById('gameBoard');
+        const viewport = document.querySelector('.board-viewport');
+        const boardRect = gameBoard.getBoundingClientRect();
+        const viewportRect = viewport.getBoundingClientRect();
+        
+        // 盤面のサイズを計算（スケール適用後）
+        const scaledWidth = boardRect.width * this.scale;
+        const scaledHeight = boardRect.height * this.scale;
+        
+        // 最大移動量を計算（盤面の半分まで画面外に出ることを許可）
+        const maxTranslateX = Math.max(0, (scaledWidth - viewportRect.width) / 2 + scaledWidth * 0.5);
+        const maxTranslateY = Math.max(0, (scaledHeight - viewportRect.height) / 2 + scaledHeight * 0.5);
+        
+        // 移動量を制限
+        this.translateX = Math.max(-maxTranslateX, Math.min(maxTranslateX, this.translateX));
+        this.translateY = Math.max(-maxTranslateY, Math.min(maxTranslateY, this.translateY));
+        
         gameBoard.style.transform = `translate(${this.translateX}px, ${this.translateY}px) scale(${this.scale})`;
     }
     
