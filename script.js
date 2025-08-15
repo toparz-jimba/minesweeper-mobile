@@ -581,13 +581,7 @@ class Minesweeper {
             }
         }
         
-        // Y軸の調整（下端のみチェック）
-        // 盤面のサイズに関わらず、下端が画面内に入りすぎている場合のみ調整
-        if (boardBottom < containerBottom - margin) {
-            // 下端が画面内に入りすぎている
-            newTranslateY = this.translateY + (containerBottom - margin - boardBottom);
-            needsAdjustment = true;
-        }
+        // Y軸の調整は行わない（上下方向は自由に移動可能）
         
         // アニメーション付きで位置を調整
         if (needsAdjustment) {
