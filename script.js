@@ -16,12 +16,7 @@ class Minesweeper {
         this.scale = 1;
         this.translateX = 0;
         this.translateY = 0;
-        this.isPanning = false;
-        this.startX = 0;
-        this.startY = 0;
-        this.lastTouchDistance = 0;
-        this.initialPinchDistance = 0;
-        this.initialScale = 1;
+        this.hammerManager = null;
         
         this.init();
     }
@@ -35,13 +30,8 @@ class Minesweeper {
         document.getElementById('resetBtn').addEventListener('click', () => this.resetGame());
         document.getElementById('difficultySelect').addEventListener('change', (e) => this.setDifficulty(e.target.value));
         
-        // ズーム・パン機能のイベントリスナー（モバイル専用）
-        const viewport = document.querySelector('.board-viewport');
-        
-        // タッチイベント（ピンチズーム・パン）
-        viewport.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
-        viewport.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: false });
-        viewport.addEventListener('touchend', (e) => this.handleTouchEnd(e), { passive: false });
+        // Hammer.jsでタッチ操作を設定
+        this.setupHammerGestures();
     }
     
     setDifficulty(level) {
@@ -192,7 +182,7 @@ class Minesweeper {
     }
     
     setupCellEventListeners(cell, row, col) {
-        // マウスイベント
+        // マウスイベント（デスクトップ用）
         cell.addEventListener('click', (e) => {
             if (e.shiftKey || e.ctrlKey) {
                 this.handleRightClick(row, col);
@@ -211,83 +201,52 @@ class Minesweeper {
             this.handleDoubleClick(row, col);
         });
         
-        // タッチイベント
-        let touchStartX, touchStartY;
-        let longPressTriggered = false;
-        let lastTapTime = 0;
-        let isMultiTouch = false;
-        
-        cell.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            
-            // マルチタッチ（ピンチ操作など）を検出
-            if (e.touches.length > 1) {
-                isMultiTouch = true;
-                clearTimeout(this.touchTimer);
-                return;
-            }
-            
-            isMultiTouch = false;
-            touchStartX = e.touches[0].clientX;
-            touchStartY = e.touches[0].clientY;
-            longPressTriggered = false;
-            
-            this.touchTimer = setTimeout(() => {
-                // マルチタッチの場合は旗を立てない
-                if (!isMultiTouch) {
-                    longPressTriggered = true;
-                    this.handleRightClick(row, col);
-                    // 旗を立てた時により強いバイブレーションフィードバック
-                    if (navigator.vibrate) {
-                        navigator.vibrate([50, 30, 50]); // パターンバイブレーション
-                    }
-                }
-            }, 170);
+        // Hammer.jsでタッチイベントを設定（モバイル用）
+        const hammer = new Hammer(cell, {
+            recognizers: [
+                [Hammer.Tap, { event: 'singletap' }],
+                [Hammer.Tap, { event: 'doubletap', taps: 2 }],
+                [Hammer.Press, { time: 170 }]
+            ]
         });
         
-        cell.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            clearTimeout(this.touchTimer);
-            
-            // マルチタッチの場合は何もしない
-            if (isMultiTouch) {
-                isMultiTouch = false;
-                return;
-            }
-            
-            // 親コンテナがパン操作中の場合はセルのクリックを無視
-            if (this.hasMoved) {
-                return;
-            }
-            
-            const touchEndX = e.changedTouches[0].clientX;
-            const touchEndY = e.changedTouches[0].clientY;
-            const distance = Math.sqrt(
-                Math.pow(touchEndX - touchStartX, 2) + 
-                Math.pow(touchEndY - touchStartY, 2)
-            );
-            
-            if (!longPressTriggered && distance < 10) {
-                const currentTime = new Date().getTime();
-                const tapLength = currentTime - lastTapTime;
-                
-                if (tapLength < 300 && tapLength > 0) {
-                    // ダブルタップ検出
-                    this.handleDoubleClick(row, col);
-                    lastTapTime = 0;
-                } else {
-                    // シングルタップ
-                    this.handleLeftClick(row, col);
-                    lastTapTime = currentTime;
-                }
-            }
+        // ダブルタップとシングルタップを区別
+        hammer.get('doubletap').recognizeWith('singletap');
+        hammer.get('singletap').requireFailure('doubletap');
+        
+        // パン操作中フラグ
+        let isPanning = false;
+        
+        // 親要素のHammerインスタンスでパン状態を監視
+        if (this.hammerManager) {
+            this.hammerManager.on('panstart', () => {
+                isPanning = true;
+            });
+            this.hammerManager.on('panend', () => {
+                setTimeout(() => {
+                    isPanning = false;
+                }, 50);
+            });
+        }
+        
+        // シングルタップ（セルを開く）
+        hammer.on('singletap', () => {
+            // パン操作中は無視
+            if (isPanning) return;
+            this.handleLeftClick(row, col);
         });
         
-        cell.addEventListener('touchmove', (e) => {
-            clearTimeout(this.touchTimer);
-            // マルチタッチを検出
-            if (e.touches.length > 1) {
-                isMultiTouch = true;
+        // ダブルタップ（周囲を開く）
+        hammer.on('doubletap', () => {
+            this.handleDoubleClick(row, col);
+        });
+        
+        // 長押し（旗を立てる）
+        hammer.on('press', () => {
+            this.handleRightClick(row, col);
+            // バイブレーションフィードバック
+            if (navigator.vibrate) {
+                navigator.vibrate([50, 30, 50]);
             }
         });
     }
@@ -460,107 +419,73 @@ class Minesweeper {
         }, 1000);
     }
     
-    // ズーム・パン機能のメソッド
-    handleTouchStart(e) {
-        if (e.touches.length === 2) {
-            // ピンチズーム開始
-            e.preventDefault();
-            const touch1 = e.touches[0];
-            const touch2 = e.touches[1];
+    // Hammer.jsでジェスチャーを設定
+    setupHammerGestures() {
+        const viewport = document.querySelector('.board-viewport');
+        const gameBoard = document.getElementById('gameBoard');
+        
+        // Hammer.jsのインスタンスを作成
+        this.hammerManager = new Hammer.Manager(viewport);
+        
+        // ピンチジェスチャーを追加
+        const pinch = new Hammer.Pinch({ enable: true });
+        const pan = new Hammer.Pan({ direction: Hammer.DIRECTION_ALL, threshold: 5 });
+        const tap = new Hammer.Tap({ event: 'singletap' });
+        const press = new Hammer.Press({ time: 170 }); // 170msで長押し認識
+        
+        // ジェスチャーを追加
+        this.hammerManager.add([pinch, pan, tap, press]);
+        
+        // ピンチとパンを同時に認識
+        pinch.recognizeWith(pan);
+        
+        // ピンチ開始
+        let lastScale = 1;
+        let startScale = 1;
+        
+        this.hammerManager.on('pinchstart', (e) => {
+            startScale = this.scale;
+            lastScale = e.scale;
+        });
+        
+        // ピンチ中
+        this.hammerManager.on('pinchmove', (e) => {
+            const scaleDelta = e.scale / lastScale;
+            const newScale = Math.max(0.5, Math.min(3, this.scale * scaleDelta));
             
-            // 初期距離を記録
-            this.initialPinchDistance = Math.hypot(
-                touch2.clientX - touch1.clientX,
-                touch2.clientY - touch1.clientY
-            );
-            this.lastTouchDistance = this.initialPinchDistance;
+            // ピンチの中心点を基準にスケール
+            const centerX = e.center.x;
+            const centerY = e.center.y;
+            const scaleRatio = newScale / this.scale;
             
-            // ピンチ開始時のスケールを記録
-            this.initialScale = this.scale;
+            this.translateX = centerX - (centerX - this.translateX) * scaleRatio;
+            this.translateY = centerY - (centerY - this.translateY) * scaleRatio;
+            this.scale = newScale;
             
-            // ピンチの中心点（画面座標）
-            this.pinchScreenX = (touch1.clientX + touch2.clientX) / 2;
-            this.pinchScreenY = (touch1.clientY + touch2.clientY) / 2;
-            
-            // ピンチ開始時の盤面位置を記録
-            this.pinchStartTranslateX = this.translateX;
-            this.pinchStartTranslateY = this.translateY;
-        } else if (e.touches.length === 1) {
-            // パン開始の準備（実際の移動は一定距離動いてから）
-            this.panStartX = e.touches[0].clientX;
-            this.panStartY = e.touches[0].clientY;
-            this.potentialPanStartX = e.touches[0].clientX - this.translateX;
-            this.potentialPanStartY = e.touches[0].clientY - this.translateY;
-            this.hasMoved = false;
-        }
-    }
-    
-    handleTouchMove(e) {
-        if (e.touches.length === 2) {
-            // ピンチズーム処理
-            e.preventDefault();
-            const touch1 = e.touches[0];
-            const touch2 = e.touches[1];
-            const currentDistance = Math.hypot(
-                touch2.clientX - touch1.clientX,
-                touch2.clientY - touch1.clientY
-            );
-            
-            // 現在のピンチ中心点
-            const currentCenterX = (touch1.clientX + touch2.clientX) / 2;
-            const currentCenterY = (touch1.clientY + touch2.clientY) / 2;
-            
-            if (this.initialPinchDistance > 0) {
-                // 初期距離からの倍率を計算
-                const scaleChange = currentDistance / this.initialPinchDistance;
-                const newScale = Math.max(0.5, Math.min(3, this.initialScale * scaleChange));
-                
-                // スケール比率
-                const scaleRatio = newScale / this.initialScale;
-                
-                // ピンチ開始時の中心点を基準に変換
-                // 開始時の中心点が現在も同じ位置に見えるように調整
-                this.translateX = this.pinchScreenX + (this.pinchStartTranslateX - this.pinchScreenX) * scaleRatio + (currentCenterX - this.pinchScreenX);
-                this.translateY = this.pinchScreenY + (this.pinchStartTranslateY - this.pinchScreenY) * scaleRatio + (currentCenterY - this.pinchScreenY);
-                this.scale = newScale;
-                
-                this.updateTransform();
-            }
-            
-            this.lastTouchDistance = currentDistance;
-        } else if (e.touches.length === 1) {
-            // 移動距離を計算
-            const moveX = e.touches[0].clientX - this.panStartX;
-            const moveY = e.touches[0].clientY - this.panStartY;
-            const distance = Math.sqrt(moveX * moveX + moveY * moveY);
-            
-            // 一定距離（10px）以上動いたらパン開始
-            if (distance > 10 || this.isPanning) {
-                if (!this.isPanning) {
-                    this.isPanning = true;
-                    this.hasMoved = true;
-                    this.startX = this.potentialPanStartX;
-                    this.startY = this.potentialPanStartY;
-                }
-                
-                // パン処理（制限なしで自由に動かす）
-                e.preventDefault();
-                this.translateX = e.touches[0].clientX - this.startX;
-                this.translateY = e.touches[0].clientY - this.startY;
-                this.updateTransform();
-            }
-        }
-    }
-    
-    handleTouchEnd(e) {
-        if (e.touches.length < 2) {
-            this.lastTouchDistance = 0;
-        }
-        if (e.touches.length === 0) {
-            this.isPanning = false;
-            // タッチ終了時に盤面位置を調整
+            this.updateTransform();
+            lastScale = e.scale;
+        });
+        
+        // パン開始
+        let startX = 0;
+        let startY = 0;
+        
+        this.hammerManager.on('panstart', (e) => {
+            startX = this.translateX;
+            startY = this.translateY;
+        });
+        
+        // パン中
+        this.hammerManager.on('panmove', (e) => {
+            this.translateX = startX + e.deltaX;
+            this.translateY = startY + e.deltaY;
+            this.updateTransform();
+        });
+        
+        // パン終了
+        this.hammerManager.on('panend', () => {
             this.adjustBoardPosition();
-        }
+        });
     }
     
     
