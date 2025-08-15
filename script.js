@@ -490,18 +490,19 @@ class Minesweeper {
                 touch2.clientY - touch1.clientY
             );
             
-            // ピンチの中心点を計算
-            const centerX = (touch1.clientX + touch2.clientX) / 2;
-            const centerY = (touch1.clientY + touch2.clientY) / 2;
+            // 現在のピンチ中心点
+            const currentCenterX = (touch1.clientX + touch2.clientX) / 2;
+            const currentCenterY = (touch1.clientY + touch2.clientY) / 2;
             
             if (this.lastTouchDistance > 0) {
                 const scaleDelta = currentDistance / this.lastTouchDistance;
                 const newScale = Math.max(0.5, Math.min(3, this.scale * scaleDelta));
-                
-                // 中心点を基準にスケールと位置を調整
                 const scaleRatio = newScale / this.scale;
-                this.translateX = centerX - (centerX - this.translateX) * scaleRatio;
-                this.translateY = centerY - (centerY - this.translateY) * scaleRatio;
+                
+                // 現在のピンチ中心点を基準にスケールと位置を調整
+                // ピンチ中心点が画面上で固定されるように計算
+                this.translateX = currentCenterX - (currentCenterX - this.translateX) * scaleRatio;
+                this.translateY = currentCenterY - (currentCenterY - this.translateY) * scaleRatio;
                 this.scale = newScale;
                 
                 this.updateTransform();
