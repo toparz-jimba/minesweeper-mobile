@@ -483,37 +483,15 @@ class Minesweeper {
                 touch2.clientY - touch1.clientY
             );
             
-            // ピンチの中心点を計算
-            const centerX = (touch1.clientX + touch2.clientX) / 2;
-            const centerY = (touch1.clientY + touch2.clientY) / 2;
-            
             if (this.lastTouchDistance > 0) {
                 const scaleDelta = currentDistance / this.lastTouchDistance;
-                const newScale = Math.max(0.5, Math.min(3, this.scale * scaleDelta));
-                
-                // ズーム中心を基準に位置を調整
-                if (newScale !== this.scale) {
-                    const scaleRatio = newScale / this.scale;
-                    const viewport = document.querySelector('.board-viewport');
-                    const viewportRect = viewport.getBoundingClientRect();
-                    
-                    // ビューポートの中心からピンチ中心への相対位置
-                    const offsetX = centerX - viewportRect.left - viewportRect.width / 2;
-                    const offsetY = centerY - viewportRect.top - viewportRect.height / 2;
-                    
-                    // 位置を調整（ズームの中心点を維持）
-                    this.translateX = this.translateX * scaleRatio - offsetX * (scaleRatio - 1);
-                    this.translateY = this.translateY * scaleRatio - offsetY * (scaleRatio - 1);
-                    
-                    this.scale = newScale;
-                }
-                
+                this.scale = Math.max(0.5, Math.min(3, this.scale * scaleDelta));
                 this.updateTransform();
             }
             
             this.lastTouchDistance = currentDistance;
         } else if (e.touches.length === 1 && this.isPanning) {
-            // パン処理
+            // パン処理（制限なしで自由に動かす）
             e.preventDefault();
             this.translateX = e.touches[0].clientX - this.startX;
             this.translateY = e.touches[0].clientY - this.startY;
@@ -527,29 +505,87 @@ class Minesweeper {
         }
         if (e.touches.length === 0) {
             this.isPanning = false;
+            // タッチ終了時に盤面位置を調整
+            this.adjustBoardPosition();
         }
     }
     
     
     updateTransform() {
         const gameBoard = document.getElementById('gameBoard');
+        gameBoard.style.transform = `translate(${this.translateX}px, ${this.translateY}px) scale(${this.scale})`;
+    }
+    
+    adjustBoardPosition() {
+        const gameBoard = document.getElementById('gameBoard');
         const viewport = document.querySelector('.board-viewport');
         const boardRect = gameBoard.getBoundingClientRect();
         const viewportRect = viewport.getBoundingClientRect();
         
-        // 盤面のサイズを計算（スケール適用後）
-        const scaledWidth = boardRect.width * this.scale;
-        const scaledHeight = boardRect.height * this.scale;
+        let needsAdjustment = false;
+        let newTranslateX = this.translateX;
+        let newTranslateY = this.translateY;
         
-        // 最大移動量を計算（盤面の半分まで画面外に出ることを許可）
-        const maxTranslateX = Math.max(0, (scaledWidth - viewportRect.width) / 2 + scaledWidth * 0.5);
-        const maxTranslateY = Math.max(0, (scaledHeight - viewportRect.height) / 2 + scaledHeight * 0.5);
+        // 盤面の実際のサイズ（元のサイズ）
+        const originalWidth = boardRect.width / this.scale;
+        const originalHeight = boardRect.height / this.scale;
         
-        // 移動量を制限
-        this.translateX = Math.max(-maxTranslateX, Math.min(maxTranslateX, this.translateX));
-        this.translateY = Math.max(-maxTranslateY, Math.min(maxTranslateY, this.translateY));
+        // 盤面の現在の端の位置
+        const boardLeft = boardRect.left;
+        const boardRight = boardRect.right;
+        const boardTop = boardRect.top;
+        const boardBottom = boardRect.bottom;
         
-        gameBoard.style.transform = `translate(${this.translateX}px, ${this.translateY}px) scale(${this.scale})`;
+        // X軸の調整
+        if (boardRect.width <= viewportRect.width) {
+            // 盤面が画面より小さい場合は中央に
+            newTranslateX = 0;
+            needsAdjustment = true;
+        } else {
+            // 盤面が画面より大きい場合
+            if (boardLeft > viewportRect.left) {
+                // 左端が画面内に入りすぎている
+                newTranslateX = this.translateX - (boardLeft - viewportRect.left);
+                needsAdjustment = true;
+            } else if (boardRight < viewportRect.right) {
+                // 右端が画面内に入りすぎている
+                newTranslateX = this.translateX + (viewportRect.right - boardRight);
+                needsAdjustment = true;
+            }
+        }
+        
+        // Y軸の調整
+        if (boardRect.height <= viewportRect.height) {
+            // 盤面が画面より小さい場合は中央に
+            newTranslateY = 0;
+            needsAdjustment = true;
+        } else {
+            // 盤面が画面より大きい場合
+            if (boardTop > viewportRect.top) {
+                // 上端が画面内に入りすぎている
+                newTranslateY = this.translateY - (boardTop - viewportRect.top);
+                needsAdjustment = true;
+            } else if (boardBottom < viewportRect.bottom) {
+                // 下端が画面内に入りすぎている
+                newTranslateY = this.translateY + (viewportRect.bottom - boardBottom);
+                needsAdjustment = true;
+            }
+        }
+        
+        // アニメーション付きで位置を調整
+        if (needsAdjustment) {
+            this.translateX = newTranslateX;
+            this.translateY = newTranslateY;
+            
+            // スムーズなアニメーション
+            gameBoard.style.transition = 'transform 0.3s ease-out';
+            this.updateTransform();
+            
+            // アニメーション後にtransitionを削除
+            setTimeout(() => {
+                gameBoard.style.transition = '';
+            }, 300);
+        }
     }
     
     resetZoom() {
