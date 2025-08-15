@@ -213,19 +213,32 @@ class Minesweeper {
         let touchStartX, touchStartY;
         let longPressTriggered = false;
         let lastTapTime = 0;
+        let isMultiTouch = false;
         
         cell.addEventListener('touchstart', (e) => {
             e.preventDefault();
+            
+            // マルチタッチ（ピンチ操作など）を検出
+            if (e.touches.length > 1) {
+                isMultiTouch = true;
+                clearTimeout(this.touchTimer);
+                return;
+            }
+            
+            isMultiTouch = false;
             touchStartX = e.touches[0].clientX;
             touchStartY = e.touches[0].clientY;
             longPressTriggered = false;
             
             this.touchTimer = setTimeout(() => {
-                longPressTriggered = true;
-                this.handleRightClick(row, col);
-                // 旗を立てた時により強いバイブレーションフィードバック
-                if (navigator.vibrate) {
-                    navigator.vibrate([50, 30, 50]); // パターンバイブレーション
+                // マルチタッチの場合は旗を立てない
+                if (!isMultiTouch) {
+                    longPressTriggered = true;
+                    this.handleRightClick(row, col);
+                    // 旗を立てた時により強いバイブレーションフィードバック
+                    if (navigator.vibrate) {
+                        navigator.vibrate([50, 30, 50]); // パターンバイブレーション
+                    }
                 }
             }, 500);
         });
@@ -233,6 +246,12 @@ class Minesweeper {
         cell.addEventListener('touchend', (e) => {
             e.preventDefault();
             clearTimeout(this.touchTimer);
+            
+            // マルチタッチの場合は何もしない
+            if (isMultiTouch) {
+                isMultiTouch = false;
+                return;
+            }
             
             const touchEndX = e.changedTouches[0].clientX;
             const touchEndY = e.changedTouches[0].clientY;
@@ -257,8 +276,12 @@ class Minesweeper {
             }
         });
         
-        cell.addEventListener('touchmove', () => {
+        cell.addEventListener('touchmove', (e) => {
             clearTimeout(this.touchTimer);
+            // マルチタッチを検出
+            if (e.touches.length > 1) {
+                isMultiTouch = true;
+            }
         });
     }
     
