@@ -540,17 +540,16 @@ class Minesweeper {
     
     adjustBoardPosition() {
         const gameBoard = document.getElementById('gameBoard');
-        const viewport = document.querySelector('.board-viewport');
+        const boardContainer = document.querySelector('.board-container');
         const boardRect = gameBoard.getBoundingClientRect();
-        const viewportRect = viewport.getBoundingClientRect();
+        const containerRect = boardContainer.getBoundingClientRect();
         
         let needsAdjustment = false;
         let newTranslateX = this.translateX;
         let newTranslateY = this.translateY;
         
-        // 盤面の実際のサイズ（元のサイズ）
-        const originalWidth = boardRect.width / this.scale;
-        const originalHeight = boardRect.height / this.scale;
+        // 余裕（マージン）を設定（20px）
+        const margin = 20;
         
         // 盤面の現在の端の位置
         const boardLeft = boardRect.left;
@@ -558,38 +557,44 @@ class Minesweeper {
         const boardTop = boardRect.top;
         const boardBottom = boardRect.bottom;
         
+        // コンテナの実際の境界（画面全体から見た位置）
+        const containerLeft = containerRect.left;
+        const containerRight = containerRect.right;
+        const containerTop = containerRect.top;
+        const containerBottom = containerRect.bottom;
+        
         // X軸の調整
-        if (boardRect.width <= viewportRect.width) {
+        if (boardRect.width <= containerRect.width) {
             // 盤面が画面より小さい場合は中央に
             newTranslateX = 0;
             needsAdjustment = true;
         } else {
-            // 盤面が画面より大きい場合
-            if (boardLeft > viewportRect.left) {
+            // 盤面が画面より大きい場合（マージンを考慮）
+            if (boardLeft > containerLeft + margin) {
                 // 左端が画面内に入りすぎている
-                newTranslateX = this.translateX - (boardLeft - viewportRect.left);
+                newTranslateX = this.translateX - (boardLeft - containerLeft - margin);
                 needsAdjustment = true;
-            } else if (boardRight < viewportRect.right) {
+            } else if (boardRight < containerRight - margin) {
                 // 右端が画面内に入りすぎている
-                newTranslateX = this.translateX + (viewportRect.right - boardRight);
+                newTranslateX = this.translateX + (containerRight - margin - boardRight);
                 needsAdjustment = true;
             }
         }
         
         // Y軸の調整
-        if (boardRect.height <= viewportRect.height) {
+        if (boardRect.height <= containerRect.height) {
             // 盤面が画面より小さい場合は中央に
             newTranslateY = 0;
             needsAdjustment = true;
         } else {
-            // 盤面が画面より大きい場合
-            if (boardTop > viewportRect.top) {
+            // 盤面が画面より大きい場合（マージンを考慮）
+            if (boardTop > containerTop + margin) {
                 // 上端が画面内に入りすぎている
-                newTranslateY = this.translateY - (boardTop - viewportRect.top);
+                newTranslateY = this.translateY - (boardTop - containerTop - margin);
                 needsAdjustment = true;
-            } else if (boardBottom < viewportRect.bottom) {
+            } else if (boardBottom < containerBottom - margin) {
                 // 下端が画面内に入りすぎている
-                newTranslateY = this.translateY + (viewportRect.bottom - boardBottom);
+                newTranslateY = this.translateY + (containerBottom - margin - boardBottom);
                 needsAdjustment = true;
             }
         }
