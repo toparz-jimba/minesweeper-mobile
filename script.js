@@ -240,7 +240,7 @@ class Minesweeper {
                         navigator.vibrate([50, 30, 50]); // パターンバイブレーション
                     }
                 }
-            }, 500);
+            }, 170);
         });
         
         cell.addEventListener('touchend', (e) => {
@@ -587,12 +587,9 @@ class Minesweeper {
             newTranslateY = 0;
             needsAdjustment = true;
         } else {
-            // 盤面が画面より大きい場合（マージンを考慮）
-            if (boardTop > containerTop + margin) {
-                // 上端が画面内に入りすぎている
-                newTranslateY = this.translateY - (boardTop - containerTop - margin);
-                needsAdjustment = true;
-            } else if (boardBottom < containerBottom - margin) {
+            // 盤面が画面より大きい場合（下端のみチェック）
+            // 上端のチェックは削除（下側を見れるようにするため）
+            if (boardBottom < containerBottom - margin) {
                 // 下端が画面内に入りすぎている
                 newTranslateY = this.translateY + (containerBottom - margin - boardBottom);
                 needsAdjustment = true;
