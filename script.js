@@ -20,6 +20,8 @@ class Minesweeper {
         this.startX = 0;
         this.startY = 0;
         this.lastTouchDistance = 0;
+        this.initialPinchDistance = 0;
+        this.initialScale = 1;
         
         this.init();
     }
@@ -465,10 +467,24 @@ class Minesweeper {
             e.preventDefault();
             const touch1 = e.touches[0];
             const touch2 = e.touches[1];
-            this.lastTouchDistance = Math.hypot(
+            
+            // 初期距離を記録
+            this.initialPinchDistance = Math.hypot(
                 touch2.clientX - touch1.clientX,
                 touch2.clientY - touch1.clientY
             );
+            this.lastTouchDistance = this.initialPinchDistance;
+            
+            // ピンチ開始時のスケールを記録
+            this.initialScale = this.scale;
+            
+            // ピンチの中心点（画面座標）
+            this.pinchScreenX = (touch1.clientX + touch2.clientX) / 2;
+            this.pinchScreenY = (touch1.clientY + touch2.clientY) / 2;
+            
+            // ピンチ開始時の盤面位置を記録
+            this.pinchStartTranslateX = this.translateX;
+            this.pinchStartTranslateY = this.translateY;
         } else if (e.touches.length === 1) {
             // パン開始の準備（実際の移動は一定距離動いてから）
             this.panStartX = e.touches[0].clientX;
@@ -494,15 +510,18 @@ class Minesweeper {
             const currentCenterX = (touch1.clientX + touch2.clientX) / 2;
             const currentCenterY = (touch1.clientY + touch2.clientY) / 2;
             
-            if (this.lastTouchDistance > 0) {
-                const scaleDelta = currentDistance / this.lastTouchDistance;
-                const newScale = Math.max(0.5, Math.min(3, this.scale * scaleDelta));
-                const scaleRatio = newScale / this.scale;
+            if (this.initialPinchDistance > 0) {
+                // 初期距離からの倍率を計算
+                const scaleChange = currentDistance / this.initialPinchDistance;
+                const newScale = Math.max(0.5, Math.min(3, this.initialScale * scaleChange));
                 
-                // 現在のピンチ中心点を基準にスケールと位置を調整
-                // ピンチ中心点が画面上で固定されるように計算
-                this.translateX = currentCenterX - (currentCenterX - this.translateX) * scaleRatio;
-                this.translateY = currentCenterY - (currentCenterY - this.translateY) * scaleRatio;
+                // スケール比率
+                const scaleRatio = newScale / this.initialScale;
+                
+                // ピンチ開始時の中心点を基準に変換
+                // 開始時の中心点が現在も同じ位置に見えるように調整
+                this.translateX = this.pinchScreenX + (this.pinchStartTranslateX - this.pinchScreenX) * scaleRatio + (currentCenterX - this.pinchScreenX);
+                this.translateY = this.pinchScreenY + (this.pinchStartTranslateY - this.pinchScreenY) * scaleRatio + (currentCenterY - this.pinchScreenY);
                 this.scale = newScale;
                 
                 this.updateTransform();
