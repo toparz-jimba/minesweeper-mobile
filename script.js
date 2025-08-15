@@ -253,6 +253,11 @@ class Minesweeper {
                 return;
             }
             
+            // 親コンテナがパン操作中の場合はセルのクリックを無視
+            if (this.hasMoved) {
+                return;
+            }
+            
             const touchEndX = e.changedTouches[0].clientX;
             const touchEndY = e.changedTouches[0].clientY;
             const distance = Math.sqrt(
@@ -464,11 +469,13 @@ class Minesweeper {
                 touch2.clientX - touch1.clientX,
                 touch2.clientY - touch1.clientY
             );
-        } else if (e.touches.length === 1 && !e.target.classList.contains('cell')) {
-            // パン開始（セル以外をタッチした場合）
-            this.isPanning = true;
-            this.startX = e.touches[0].clientX - this.translateX;
-            this.startY = e.touches[0].clientY - this.translateY;
+        } else if (e.touches.length === 1) {
+            // パン開始の準備（実際の移動は一定距離動いてから）
+            this.panStartX = e.touches[0].clientX;
+            this.panStartY = e.touches[0].clientY;
+            this.potentialPanStartX = e.touches[0].clientX - this.translateX;
+            this.potentialPanStartY = e.touches[0].clientY - this.translateY;
+            this.hasMoved = false;
         }
     }
     
@@ -490,12 +497,27 @@ class Minesweeper {
             }
             
             this.lastTouchDistance = currentDistance;
-        } else if (e.touches.length === 1 && this.isPanning) {
-            // パン処理（制限なしで自由に動かす）
-            e.preventDefault();
-            this.translateX = e.touches[0].clientX - this.startX;
-            this.translateY = e.touches[0].clientY - this.startY;
-            this.updateTransform();
+        } else if (e.touches.length === 1) {
+            // 移動距離を計算
+            const moveX = e.touches[0].clientX - this.panStartX;
+            const moveY = e.touches[0].clientY - this.panStartY;
+            const distance = Math.sqrt(moveX * moveX + moveY * moveY);
+            
+            // 一定距離（10px）以上動いたらパン開始
+            if (distance > 10 || this.isPanning) {
+                if (!this.isPanning) {
+                    this.isPanning = true;
+                    this.hasMoved = true;
+                    this.startX = this.potentialPanStartX;
+                    this.startY = this.potentialPanStartY;
+                }
+                
+                // パン処理（制限なしで自由に動かす）
+                e.preventDefault();
+                this.translateX = e.touches[0].clientX - this.startX;
+                this.translateY = e.touches[0].clientY - this.startY;
+                this.updateTransform();
+            }
         }
     }
     
