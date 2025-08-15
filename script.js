@@ -581,19 +581,12 @@ class Minesweeper {
             }
         }
         
-        // Y軸の調整
-        if (boardRect.height <= containerRect.height) {
-            // 盤面が画面より小さい場合は中央に
-            newTranslateY = 0;
+        // Y軸の調整（下端のみチェック）
+        // 盤面のサイズに関わらず、下端が画面内に入りすぎている場合のみ調整
+        if (boardBottom < containerBottom - margin) {
+            // 下端が画面内に入りすぎている
+            newTranslateY = this.translateY + (containerBottom - margin - boardBottom);
             needsAdjustment = true;
-        } else {
-            // 盤面が画面より大きい場合（下端のみチェック）
-            // 上端のチェックは削除（下側を見れるようにするため）
-            if (boardBottom < containerBottom - margin) {
-                // 下端が画面内に入りすぎている
-                newTranslateY = this.translateY + (containerBottom - margin - boardBottom);
-                needsAdjustment = true;
-            }
         }
         
         // アニメーション付きで位置を調整
