@@ -1,14 +1,13 @@
-# macOS
+# OS generated files
 .DS_Store
-.AppleDouble
-.LSOverride
-
-# Windows
-Thumbs.db
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
 ehthumbs.db
-Desktop.ini
+Thumbs.db
 
-# IDEs
+# IDE files
 .vscode/
 .idea/
 *.swp
@@ -17,19 +16,10 @@ Desktop.ini
 
 # Logs
 *.log
-npm-debug.log*
 
-# Dependencies
+# Node modules (if you add any dependencies later)
 node_modules/
 
 # Build outputs
 dist/
 build/
-
-# Temporary files
-*.tmp
-*.temp
-.cache/
-
-# Buildozer
-.buildozer/

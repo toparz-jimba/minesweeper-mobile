@@ -4,176 +4,52 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Minesweeper game project built as a Progressive Web App (PWA). The core game is built with HTML/CSS/JavaScript and can be installed on smartphones and PCs as a standalone app without any app store.
+This is a Japanese-language Minesweeper game implemented as a vanilla JavaScript web application. The game features three difficulty levels, touch/mobile support, and a clean visual design.
 
-### Recent Updates (2025-07-30)
-- Added advanced probability calculation system using Constraint Satisfaction Problem (CSP) algorithms
-- Implemented three probability assistance features:
-  - **Hint System**: Shows optimal moves with detailed calculation explanations
-  - **Statistics Mode**: Real-time probability overlay on game board
-  - **Probability Analysis View**: Full board probability visualization in a popup modal
-- All probability calculations consider multiple constraints simultaneously for accurate results
+## Architecture
 
-## Core Architecture
+### Core Components
 
-### Core Files
-- **index.html**: Main HTML structure with semantic layout and PWA meta tags
-- **style.css**: Modern CSS with Flexbox/Grid, gradients, animations, and responsive design
-- **script.js**: ES6+ class-based `Minesweeper` game logic with comprehensive event handling
+1. **Minesweeper Class** (script.js:1-309)
+   - Main game engine managing all game state and logic
+   - Handles board initialization, mine placement, cell revealing, and win/lose conditions
+   - Implements both mouse and touch controls for mobile compatibility
 
-### PWA Files
-- **manifest.json**: Web App Manifest defining app metadata, icons, and display settings
-- **service-worker.js**: Service Worker for offline functionality and caching
-- **icons/**: Multiple icon sizes for different devices and contexts
-- **icon.svg**: Source vector icon for generating raster icons
+2. **Game Board Structure**
+   - 2D array storing cell objects with properties: `isMine`, `isRevealed`, `isFlagged`, `neighborMines`
+   - Dynamic grid sizing based on difficulty (9×9, 16×16, 16×30)
+   - Recursive flood-fill algorithm for revealing empty cells
 
-### Key Design Patterns
-- Single `Minesweeper` class managing all game state and UI
-- Cell data structure: `{isMine, isRevealed, isFlagged, neighborMines, element}`
-- Event-driven architecture with proper delegation
-- CSS Transform-based zoom functionality with dynamic padding adjustment
+3. **Event Handling**
+   - Dual input system: Mouse clicks and touch gestures
+   - Long press (500ms) on mobile triggers flag placement with vibration feedback
+   - Touch movement detection to differentiate between taps and drags
 
-## Common Development Commands
+## Key Features
 
-### Running the Web Version
-```bash
-# Open directly in browser (limited PWA functionality)
-open index.html
+- **Difficulty Levels**: Easy (9×9, 10 mines), Medium (16×16, 40 mines), Hard (16×30, 99 mines)
+- **Mobile Optimization**: Touch controls with long-press for flagging
+- **Game Timer**: Starts on first click, displays elapsed seconds
+- **Visual Feedback**: Emoji-based reset button states (😊, 😎, 😵)
+- **Responsive Design**: CSS Grid layout with dynamic cell sizing
 
-# Run local server (full PWA support)
-python3 -m http.server 8000
-# Access at http://localhost:8000
-```
+## Development Commands
 
-### PWA Testing
-```bash
-# Test Service Worker locally
-python3 -m http.server 8000
+Since this is a vanilla JavaScript project with no build tools:
+- Open `index.html` directly in a browser to run
+- No build, test, or lint commands needed
+- Use browser DevTools for debugging
 
-# Check PWA readiness in Chrome DevTools
-# 1. Open http://localhost:8000
-# 2. Press F12 to open DevTools
-# 3. Go to Application tab
-# 4. Check Manifest, Service Workers sections
-```
+## Important Implementation Details
 
-### Deployment (Free Options)
-```bash
-# GitHub Pages
-git init
-git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/[username]/minesweeper.git
-git push -u origin main
-# Enable GitHub Pages in repository settings
+- Mine count is calculated during board creation by incrementing `neighborMines` for all adjacent cells
+- Game completion is checked by comparing revealed non-mine cells to total non-mine cells
+- Touch controls use a timer-based system to distinguish between tap (reveal) and long-press (flag)
+- CSS uses data attributes for number coloring (`data-count` for 1-8)
+- All UI text is in Japanese (リセット, 簡単, 普通, 難しい)
 
-# Or use drag-and-drop services like Netlify/Vercel
-```
+## Current Branch Structure
 
-## Critical Implementation Details
-
-### Special Features
-1. **Chord Function**: Double-click on revealed number cells to auto-reveal adjacent unflagged cells (if flag count matches the number)
-2. **First Click Protection**: Mines are never placed on the first clicked cell
-3. **Auto-reveal**: Empty cells trigger recursive neighbor revealing
-4. **Zoom System**: 50%-300% zoom with scroll wrapper ensuring all edges remain accessible
-5. **Extreme Difficulty**: 64×64 grid with 999 mines, requires special CSS handling
-6. **PWA Support**: Installable as standalone app with offline functionality
-7. **Service Worker**: Caches all game assets for offline play
-8. **Hint System (ヒント機能)**: 
-   - Shows cells with lowest mine probability with detailed calculation explanation
-   - CSP-based probability calculation considering multiple constraints
-   - Displays calculation process showing why specific probability was determined
-9. **Statistics Mode (統計モード)**: 
-   - Real-time probability display on all unrevealed cells
-   - Toggle mode to see mine probabilities while playing
-   - Uses advanced CSP algorithm for accurate multi-constraint calculations
-10. **Probability Analysis View (確率分析ビュー)**: 
-   - Full board duplicate showing all cell probabilities at once
-   - Color-coded visualization (green=safe, red=mine, gradient for probabilities)
-   - Popup modal for comprehensive probability overview
-
-### Performance Considerations
-- DOM manipulation is optimized for the 64×64 extreme difficulty
-- Zoom uses CSS transforms for performance
-- Event delegation reduces listener count
-- Cell size dynamically adjusts based on difficulty
-- CSP probability calculations limited to groups of 20 cells or less to maintain performance
-- Advanced probability calculations use constraint grouping to reduce computational complexity
-
-### Important Functions
-- `placeMines(excludeRow, excludeCol)`: Mine placement with first-click exclusion
-- `revealCell(row, col)`: Core game logic for revealing cells
-- `handleDoubleClick()`: Implements chord functionality
-- `updateZoom()`: Manages zoom state and dynamic padding
-- `createGameBoardWrapper()`: Creates scroll container for zoom functionality
-- `calculateAdvancedProbabilities()`: CSP-based probability calculation with constraint grouping
-- `showHint()`: Displays hint with detailed calculation explanation
-- `toggleStatsMode()`: Toggles real-time probability display on cells
-- `showProbabilityView()`: Shows full board probability analysis
-- `getDetailedProbabilityCalculation()`: Generates detailed explanation of probability calculations
-
-## Code Style Guidelines
-
-### JavaScript
-- ES6+ features (classes, arrow functions, template literals)
-- camelCase naming
-- Single class pattern
-- No external dependencies
-
-### CSS
-- Flexbox and Grid for layout
-- CSS variables for theming potential
-- kebab-case naming
-- Mobile-first responsive design
-
-### General
-- All comments and documentation in Japanese
-- Self-contained project (no external libraries)
-- Semantic HTML structure
-- Consistent indentation and formatting
-
-## Testing Approach
-
-The project doesn't have formal tests, but when making changes:
-1. Test all difficulty levels (especially extreme 64×64)
-2. Verify zoom functionality at all levels
-3. Check mobile responsiveness
-4. Test chord function edge cases
-5. Ensure first-click protection works
-6. Verify PWA installation on different browsers
-7. Test offline functionality after caching
-8. Check Service Worker updates work correctly
-9. Test hint system with various board configurations
-10. Verify probability calculations are accurate with CSP algorithm
-11. Test statistics mode toggle and probability display updates
-12. Check probability analysis view with different difficulty levels
-
-## Important Notes
-
-- Always read README.md first for detailed implementation
-- Maintain design pattern consistency
-- Preserve self-contained nature (no external dependencies)
-- Follow existing event handling patterns
-- Consider mobile compatibility for all changes
-- Test PWA features in HTTPS context (localhost is exception)
-- Service Worker requires secure context except for localhost
-- Update Service Worker version when changing cached files
-
-## PWA-Specific Guidelines
-
-### Icon Generation
-- Use `icon.svg` as source for all icon sizes
-- Run `python3 generate_icons.py` if ImageMagick is installed
-- Otherwise use online tools or the placeholder scripts
-- Minimum required: 192x192 and 512x512 icons
-
-### Cache Management
-- Update `CACHE_NAME` version in service-worker.js when deploying changes
-- Test cache invalidation in browser DevTools
-- Verify offline functionality after updates
-
-### Manifest Updates
-- Keep manifest.json in sync with any app metadata changes
-- Test on both Android and iOS for compatibility
-- Verify theme_color matches app design
+- Working on `mobile-optimization` branch
+- Main development branch appears to be `difficulty-version`
+- Recent commits show addition of hint functionality and advanced calculations

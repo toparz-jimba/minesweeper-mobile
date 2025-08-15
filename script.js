@@ -1,1279 +1,447 @@
 class Minesweeper {
     constructor() {
-        this.gameBoard = document.getElementById('game-board');
-        this.mineCountDisplay = document.getElementById('mine-count');
-        this.timerDisplay = document.getElementById('timer');
-        this.resetButton = document.getElementById('reset-btn');
-        this.difficultySelect = document.getElementById('difficulty');
-        this.gameMessage = document.getElementById('game-message');
-        this.zoomInButton = document.getElementById('zoom-in');
-        this.zoomOutButton = document.getElementById('zoom-out');
-        this.zoomResetButton = document.getElementById('zoom-reset');
-        this.zoomLevelDisplay = document.getElementById('zoom-level');
-        this.hintButton = document.getElementById('hint-btn');
-        this.statsButton = document.getElementById('stats-btn');
-        this.probabilityButton = document.getElementById('probability-btn');
-        this.probabilityView = document.getElementById('probability-view');
-        this.probabilityBoard = document.getElementById('probability-board');
-        this.closeProbabilityButton = document.getElementById('close-probability-view');
-        
-        // ゲームボードラッパーを作成
-        this.createGameBoardWrapper();
-        
-        this.difficulties = {
-            easy: { rows: 9, cols: 9, mines: 10 },
-            medium: { rows: 16, cols: 16, mines: 40 },
-            hard: { rows: 16, cols: 30, mines: 99 },
-            extreme: { rows: 64, cols: 64, mines: 999 },
-            easyBack: { rows: 9, cols: 9, mines: 20 },
-            mediumBack: { rows: 16, cols: 16, mines: 64 },
-            hardBack: { rows: 16, cols: 30, mines: 120 }
-        };
-        
-        this.currentDifficulty = 'easy';
         this.board = [];
-        this.gameState = 'playing'; // 'playing', 'won', 'lost'
-        this.firstClick = true;
-        this.flaggedCells = 0;
-        this.revealedCells = 0;
+        this.rows = 16;
+        this.cols = 16;
+        this.mines = 40;
+        this.flagCount = 0;
+        this.revealedCount = 0;
+        this.gameOver = false;
         this.timer = 0;
         this.timerInterval = null;
-        this.zoomLevel = 1.0; // 拡大縮小レベル (1.0 = 100%)
-        this.minZoom = 0.5; // 最小ズーム (50%)
-        this.maxZoom = 3.0; // 最大ズーム (300%)
-        this.zoomStep = 0.1; // ズームステップ (10%)
+        this.touchStartTime = 0;
+        this.touchTimer = null;
         
-        // ヒント機能用の変数
-        this.probabilities = []; // 各セルの爆弾確率
-        this.hintHighlightedCells = []; // ヒントで光っているセル
-        this.statsMode = false; // 統計モードのオンオフ
+        // ズーム・パン機能用の変数
+        this.scale = 1;
+        this.translateX = 0;
+        this.translateY = 0;
+        this.isPanning = false;
+        this.startX = 0;
+        this.startY = 0;
+        this.lastTouchDistance = 0;
         
-        this.initializeEventListeners();
-        this.newGame();
+        this.init();
     }
     
-    createGameBoardWrapper() {
-        // ゲームボードの親要素を取得
-        const gameArea = this.gameBoard.parentElement;
-        
-        // ラッパーdivを作成
-        const wrapper = document.createElement('div');
-        wrapper.className = 'game-board-wrapper';
-        
-        // ゲームボードをラッパーに移動
-        gameArea.insertBefore(wrapper, this.gameBoard);
-        wrapper.appendChild(this.gameBoard);
-        
-        // ラッパーの参照を保存
-        this.gameBoardWrapper = wrapper;
+    init() {
+        this.setupEventListeners();
+        this.resetGame();
     }
     
-    initializeEventListeners() {
-        this.resetButton.addEventListener('click', () => this.newGame());
-        this.difficultySelect.addEventListener('change', (e) => {
-            this.currentDifficulty = e.target.value;
-            this.newGame();
-        });
+    setupEventListeners() {
+        document.getElementById('resetBtn').addEventListener('click', () => this.resetGame());
+        document.getElementById('easyBtn').addEventListener('click', () => this.setDifficulty('easy'));
+        document.getElementById('mediumBtn').addEventListener('click', () => this.setDifficulty('medium'));
+        document.getElementById('hardBtn').addEventListener('click', () => this.setDifficulty('hard'));
         
-        // 拡大縮小機能のイベントリスナー
-        this.zoomInButton.addEventListener('click', () => this.zoomIn());
-        this.zoomOutButton.addEventListener('click', () => this.zoomOut());
-        this.zoomResetButton.addEventListener('click', () => this.zoomReset());
+        // ズーム・パン機能のイベントリスナー（モバイル専用）
+        const viewport = document.querySelector('.board-viewport');
         
-        // ヒントボタンのイベントリスナー
-        this.hintButton.addEventListener('click', () => this.showHint());
-        
-        // 統計モードボタンのイベントリスナー
-        this.statsButton.addEventListener('click', () => this.toggleStatsMode());
-        
-        // 確率分析ボタンのイベントリスナー
-        this.probabilityButton.addEventListener('click', () => this.showProbabilityView());
-        this.closeProbabilityButton.addEventListener('click', () => this.hideProbabilityView());
+        // タッチイベント（ピンチズーム・パン）
+        viewport.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
+        viewport.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: false });
+        viewport.addEventListener('touchend', (e) => this.handleTouchEnd(e), { passive: false });
     }
     
-    newGame() {
-        this.gameState = 'playing';
-        this.firstClick = true;
-        this.flaggedCells = 0;
-        this.revealedCells = 0;
-        this.timer = 0;
-        this.clearTimer();
-        this.updateDisplay();
-        this.hideMessage();
-        this.clearHintHighlight(); // ヒントハイライトをクリア
-        if (this.statsMode) {
-            this.clearStatsMode(); // 統計モードをクリア
+    setDifficulty(level) {
+        document.querySelectorAll('.difficulty-btn').forEach(btn => btn.classList.remove('active'));
+        
+        switch(level) {
+            case 'easy':
+                this.rows = 9;
+                this.cols = 9;
+                this.mines = 10;
+                document.getElementById('easyBtn').classList.add('active');
+                break;
+            case 'medium':
+                this.rows = 16;
+                this.cols = 16;
+                this.mines = 40;
+                document.getElementById('mediumBtn').classList.add('active');
+                break;
+            case 'hard':
+                this.rows = 16;
+                this.cols = 30;
+                this.mines = 99;
+                document.getElementById('hardBtn').classList.add('active');
+                break;
         }
+        
+        this.resetGame();
+    }
+    
+    resetGame() {
+        this.board = [];
+        this.flagCount = 0;
+        this.revealedCount = 0;
+        this.gameOver = false;
+        this.timer = 0;
+        
+        clearInterval(this.timerInterval);
+        
+        document.getElementById('resetBtn').textContent = 'リセット 😊';
+        document.getElementById('mineCount').textContent = this.mines;
+        document.getElementById('flagCount').textContent = '0';
+        document.getElementById('timer').textContent = '0';
+        
+        this.resetZoom();
         this.createBoard();
-        this.updateZoom(); // ズーム状態を初期化
+        this.placeMines();
+        this.renderBoard();
     }
     
     createBoard() {
-        const config = this.difficulties[this.currentDifficulty];
-        this.board = [];
-        this.gameBoard.innerHTML = '';
-        
-        // セルサイズを難易度に応じて調整
-        const cellSize = this.currentDifficulty === 'extreme' ? '15px' : '30px';
-        
-        // ボードのグリッドサイズを設定
-        this.gameBoard.style.gridTemplateColumns = `repeat(${config.cols}, ${cellSize})`;
-        this.gameBoard.style.gridTemplateRows = `repeat(${config.rows}, ${cellSize})`;
-        
-        // ボードデータの初期化
-        for (let row = 0; row < config.rows; row++) {
-            this.board[row] = [];
-            for (let col = 0; col < config.cols; col++) {
-                this.board[row][col] = {
+        for (let i = 0; i < this.rows; i++) {
+            this.board[i] = [];
+            for (let j = 0; j < this.cols; j++) {
+                this.board[i][j] = {
                     isMine: false,
                     isRevealed: false,
                     isFlagged: false,
-                    neighborMines: 0,
-                    element: null
+                    neighborMines: 0
                 };
             }
         }
-        
-        // セル要素の作成
-        for (let row = 0; row < config.rows; row++) {
-            for (let col = 0; col < config.cols; col++) {
-                const cell = document.createElement('div');
-                cell.className = 'cell';
-                cell.dataset.row = row;
-                cell.dataset.col = col;
-                
-                cell.addEventListener('click', (e) => this.handleCellClick(e, row, col));
-                cell.addEventListener('dblclick', (e) => this.handleDoubleClick(e, row, col));
-                cell.addEventListener('contextmenu', (e) => this.handleRightClick(e, row, col));
-                
-                this.board[row][col].element = cell;
-                this.gameBoard.appendChild(cell);
-            }
-        }
     }
     
-    placeMines(excludeRow, excludeCol) {
-        const config = this.difficulties[this.currentDifficulty];
-        const totalCells = config.rows * config.cols;
-        const mines = [];
+    placeMines() {
+        let minesPlaced = 0;
         
-        // 地雷位置をランダムに決定（最初のクリック位置は除外）
-        while (mines.length < config.mines) {
-            const row = Math.floor(Math.random() * config.rows);
-            const col = Math.floor(Math.random() * config.cols);
+        while (minesPlaced < this.mines) {
+            const row = Math.floor(Math.random() * this.rows);
+            const col = Math.floor(Math.random() * this.cols);
             
-            if ((row !== excludeRow || col !== excludeCol) && 
-                !mines.some(mine => mine.row === row && mine.col === col)) {
-                mines.push({ row, col });
+            if (!this.board[row][col].isMine) {
                 this.board[row][col].isMine = true;
-            }
-        }
-        
-        // 隣接地雷数を計算
-        this.calculateNeighborMines();
-    }
-    
-    calculateNeighborMines() {
-        const config = this.difficulties[this.currentDifficulty];
-        
-        for (let row = 0; row < config.rows; row++) {
-            for (let col = 0; col < config.cols; col++) {
-                if (!this.board[row][col].isMine) {
-                    let count = 0;
-                    for (let r = Math.max(0, row - 1); r <= Math.min(config.rows - 1, row + 1); r++) {
-                        for (let c = Math.max(0, col - 1); c <= Math.min(config.cols - 1, col + 1); c++) {
-                            if (this.board[r][c].isMine) {
-                                count++;
-                            }
+                minesPlaced++;
+                
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        if (dr === 0 && dc === 0) continue;
+                        const newRow = row + dr;
+                        const newCol = col + dc;
+                        if (this.isValidCell(newRow, newCol)) {
+                            this.board[newRow][newCol].neighborMines++;
                         }
                     }
-                    this.board[row][col].neighborMines = count;
                 }
             }
         }
     }
     
-    handleCellClick(event, row, col) {
-        event.preventDefault();
+    renderBoard() {
+        const gameBoard = document.getElementById('gameBoard');
+        gameBoard.innerHTML = '';
+        gameBoard.className = 'game-board';
         
-        if (this.gameState !== 'playing' || this.board[row][col].isFlagged || this.board[row][col].isRevealed) {
-            return;
+        if (this.gameOver) {
+            gameBoard.classList.add('game-over');
         }
         
-        // ヒントハイライトをクリア
-        this.clearHintHighlight();
+        const cellSize = this.cols > 20 ? '20px' : this.cols > 10 ? '25px' : '35px';
+        gameBoard.style.gridTemplateColumns = `repeat(${this.cols}, ${cellSize})`;
+        gameBoard.style.gridTemplateRows = `repeat(${this.rows}, ${cellSize})`;
         
-        if (this.firstClick) {
-            this.firstClick = false;
-            this.placeMines(row, col);
+        for (let i = 0; i < this.rows; i++) {
+            for (let j = 0; j < this.cols; j++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.dataset.row = i;
+                cell.dataset.col = j;
+                
+                const cellData = this.board[i][j];
+                
+                if (cellData.isRevealed) {
+                    cell.classList.add('revealed');
+                    if (cellData.isMine) {
+                        cell.classList.add('mine');
+                    } else if (cellData.neighborMines > 0) {
+                        cell.textContent = cellData.neighborMines;
+                        cell.dataset.count = cellData.neighborMines;
+                    }
+                } else if (cellData.isFlagged) {
+                    cell.classList.add('flagged');
+                }
+                
+                this.setupCellEventListeners(cell, i, j);
+                gameBoard.appendChild(cell);
+            }
+        }
+    }
+    
+    setupCellEventListeners(cell, row, col) {
+        let touchStartX, touchStartY;
+        let longPressTriggered = false;
+        let lastTapTime = 0;
+        
+        cell.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            longPressTriggered = false;
+            
+            this.touchTimer = setTimeout(() => {
+                longPressTriggered = true;
+                this.handleRightClick(row, col);
+                navigator.vibrate && navigator.vibrate(50);
+            }, 500);
+        });
+        
+        cell.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            clearTimeout(this.touchTimer);
+            
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            const distance = Math.sqrt(
+                Math.pow(touchEndX - touchStartX, 2) + 
+                Math.pow(touchEndY - touchStartY, 2)
+            );
+            
+            if (!longPressTriggered && distance < 10) {
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTapTime;
+                
+                if (tapLength < 300 && tapLength > 0) {
+                    // ダブルタップ検出
+                    this.handleDoubleClick(row, col);
+                    lastTapTime = 0;
+                } else {
+                    // シングルタップ
+                    this.handleLeftClick(row, col);
+                    lastTapTime = currentTime;
+                }
+            }
+        });
+        
+        cell.addEventListener('touchmove', () => {
+            clearTimeout(this.touchTimer);
+        });
+        
+    }
+    
+    handleLeftClick(row, col) {
+        if (this.gameOver) return;
+        
+        const cell = this.board[row][col];
+        
+        if (cell.isFlagged || cell.isRevealed) return;
+        
+        if (this.timer === 0) {
             this.startTimer();
         }
         
         this.revealCell(row, col);
-    }
-    
-    handleRightClick(event, row, col) {
-        event.preventDefault();
-        
-        if (this.gameState !== 'playing' || this.board[row][col].isRevealed) {
-            return;
-        }
-        
-        // ヒントハイライトをクリア
-        this.clearHintHighlight();
-        
-        this.toggleFlag(row, col);
-    }
-    
-    handleDoubleClick(event, row, col) {
-        event.preventDefault();
-        
-        if (this.gameState !== 'playing') {
-            return;
-        }
-        
-        const cell = this.board[row][col];
-        
-        // 開かれた数字セルのみ対象
-        if (!cell.isRevealed || cell.isMine || cell.neighborMines === 0) {
-            return;
-        }
-        
-        // 周囲のフラグ数をカウント
-        const flagCount = this.countAdjacentFlags(row, col);
-        
-        // フラグ数が数字と一致する場合、残りのセルを開く
-        if (flagCount === cell.neighborMines) {
-            // ヒントハイライトをクリア
-            this.clearHintHighlight();
-            this.revealAdjacentUnflagged(row, col);
-        }
-    }
-    
-    revealCell(row, col) {
-        const cell = this.board[row][col];
-        
-        if (cell.isRevealed || cell.isFlagged) {
-            return;
-        }
-        
-        cell.isRevealed = true;
-        cell.element.classList.add('revealed');
-        this.revealedCells++;
         
         if (cell.isMine) {
-            this.gameOver(false);
-            return;
-        }
-        
-        if (cell.neighborMines > 0) {
-            cell.element.textContent = cell.neighborMines;
-            cell.element.classList.add(`number-${cell.neighborMines}`);
+            this.endGame(false);
         } else {
-            // 隣接セルを自動で開く
-            this.revealNeighbors(row, col);
-        }
-        
-        this.checkWinCondition();
-        
-        // 統計モードが有効な場合は更新
-        this.updateStatsModeIfActive();
-    }
-    
-    revealNeighbors(row, col) {
-        const config = this.difficulties[this.currentDifficulty];
-        
-        for (let r = Math.max(0, row - 1); r <= Math.min(config.rows - 1, row + 1); r++) {
-            for (let c = Math.max(0, col - 1); c <= Math.min(config.cols - 1, col + 1); c++) {
-                if (r !== row || c !== col) {
-                    this.revealCell(r, c);
-                }
-            }
+            this.checkWin();
         }
     }
     
-    toggleFlag(row, col) {
+    handleRightClick(row, col) {
+        if (this.gameOver) return;
+        
         const cell = this.board[row][col];
+        
+        if (cell.isRevealed) return;
         
         if (cell.isFlagged) {
             cell.isFlagged = false;
-            cell.element.classList.remove('flagged');
-            cell.element.textContent = '';
-            this.flaggedCells--;
+            this.flagCount--;
         } else {
-            cell.isFlagged = true;
-            cell.element.classList.add('flagged');
-            cell.element.textContent = '🚩';
-            this.flaggedCells++;
+            if (this.flagCount < this.mines) {
+                cell.isFlagged = true;
+                this.flagCount++;
+            }
         }
         
-        this.updateDisplay();
-        
-        // 統計モードが有効な場合は更新
-        this.updateStatsModeIfActive();
+        document.getElementById('flagCount').textContent = this.flagCount;
+        this.renderBoard();
     }
     
-    checkWinCondition() {
-        const config = this.difficulties[this.currentDifficulty];
-        const totalCells = config.rows * config.cols;
-        const nonMineCells = totalCells - config.mines;
+    handleDoubleClick(row, col) {
+        if (this.gameOver) return;
         
-        if (this.revealedCells === nonMineCells) {
-            this.gameOver(true);
-        }
-    }
-    
-    gameOver(won) {
-        this.gameState = won ? 'won' : 'lost';
-        this.clearTimer();
+        const cell = this.board[row][col];
         
-        if (!won) {
-            // すべての地雷を表示
-            const config = this.difficulties[this.currentDifficulty];
-            for (let row = 0; row < config.rows; row++) {
-                for (let col = 0; col < config.cols; col++) {
-                    const cell = this.board[row][col];
-                    if (cell.isMine && !cell.isFlagged) {
-                        cell.element.classList.add('mine');
-                        cell.element.textContent = '💣';
+        // 開いていて数字があるセルのみ処理
+        if (!cell.isRevealed || cell.neighborMines === 0) return;
+        
+        // 周囲のフラグ数をカウント
+        let flaggedCount = 0;
+        for (let i = row - 1; i <= row + 1; i++) {
+            for (let j = col - 1; j <= col + 1; j++) {
+                if (i >= 0 && i < this.rows && j >= 0 && j < this.cols) {
+                    if (this.board[i][j].isFlagged) {
+                        flaggedCount++;
                     }
                 }
             }
         }
         
-        this.showMessage(won);
+        // フラグ数が数字と一致する場合のみ周囲を開く
+        if (flaggedCount === cell.neighborMines) {
+            let hitMine = false;
+            for (let i = row - 1; i <= row + 1; i++) {
+                for (let j = col - 1; j <= col + 1; j++) {
+                    if (i >= 0 && i < this.rows && j >= 0 && j < this.cols) {
+                        const neighborCell = this.board[i][j];
+                        if (!neighborCell.isRevealed && !neighborCell.isFlagged) {
+                            this.revealCell(i, j);
+                            if (neighborCell.isMine) {
+                                hitMine = true;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (hitMine) {
+                this.endGame(false);
+            } else {
+                this.checkWin();
+            }
+        }
     }
     
-    showMessage(won) {
-        this.gameMessage.textContent = won ? 
-            `🎉 おめでとうございます！ ${this.timer}秒でクリアしました！` : 
-            '💥 ゲームオーバー！もう一度挑戦してください。';
-        this.gameMessage.className = `game-message ${won ? 'win' : 'lose'}`;
-        this.gameMessage.classList.remove('hidden');
+    revealCell(row, col) {
+        if (!this.isValidCell(row, col)) return;
+        
+        const cell = this.board[row][col];
+        
+        if (cell.isRevealed || cell.isFlagged) return;
+        
+        cell.isRevealed = true;
+        this.revealedCount++;
+        
+        if (!cell.isMine && cell.neighborMines === 0) {
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    if (dr === 0 && dc === 0) continue;
+                    this.revealCell(row + dr, col + dc);
+                }
+            }
+        }
+        
+        this.renderBoard();
     }
     
-    hideMessage() {
-        this.gameMessage.classList.add('hidden');
+    isValidCell(row, col) {
+        return row >= 0 && row < this.rows && col >= 0 && col < this.cols;
+    }
+    
+    checkWin() {
+        const totalCells = this.rows * this.cols;
+        const nonMineCells = totalCells - this.mines;
+        
+        if (this.revealedCount === nonMineCells) {
+            this.endGame(true);
+        }
+    }
+    
+    endGame(won) {
+        this.gameOver = true;
+        clearInterval(this.timerInterval);
+        
+        if (won) {
+            document.getElementById('resetBtn').textContent = 'リセット 😎';
+            alert('おめでとう！クリアしました！');
+        } else {
+            document.getElementById('resetBtn').textContent = 'リセット 😵';
+            this.revealAllMines();
+        }
+    }
+    
+    revealAllMines() {
+        for (let i = 0; i < this.rows; i++) {
+            for (let j = 0; j < this.cols; j++) {
+                if (this.board[i][j].isMine) {
+                    this.board[i][j].isRevealed = true;
+                }
+            }
+        }
+        this.renderBoard();
     }
     
     startTimer() {
         this.timerInterval = setInterval(() => {
             this.timer++;
-            this.updateDisplay();
+            document.getElementById('timer').textContent = this.timer;
         }, 1000);
     }
     
-    clearTimer() {
-        if (this.timerInterval) {
-            clearInterval(this.timerInterval);
-            this.timerInterval = null;
+    // ズーム・パン機能のメソッド
+    handleTouchStart(e) {
+        if (e.touches.length === 2) {
+            // ピンチズーム開始
+            e.preventDefault();
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            this.lastTouchDistance = Math.hypot(
+                touch2.clientX - touch1.clientX,
+                touch2.clientY - touch1.clientY
+            );
+        } else if (e.touches.length === 1 && !e.target.classList.contains('cell')) {
+            // パン開始（セル以外をタッチした場合）
+            this.isPanning = true;
+            this.startX = e.touches[0].clientX - this.translateX;
+            this.startY = e.touches[0].clientY - this.translateY;
         }
     }
     
-    countAdjacentFlags(row, col) {
-        const config = this.difficulties[this.currentDifficulty];
-        let flagCount = 0;
-        
-        for (let r = Math.max(0, row - 1); r <= Math.min(config.rows - 1, row + 1); r++) {
-            for (let c = Math.max(0, col - 1); c <= Math.min(config.cols - 1, col + 1); c++) {
-                if (r !== row || c !== col) {
-                    if (this.board[r][c].isFlagged) {
-                        flagCount++;
-                    }
-                }
-            }
-        }
-        
-        return flagCount;
-    }
-    
-    revealAdjacentUnflagged(row, col) {
-        const config = this.difficulties[this.currentDifficulty];
-        
-        for (let r = Math.max(0, row - 1); r <= Math.min(config.rows - 1, row + 1); r++) {
-            for (let c = Math.max(0, col - 1); c <= Math.min(config.cols - 1, col + 1); c++) {
-                if (r !== row || c !== col) {
-                    const adjacentCell = this.board[r][c];
-                    if (!adjacentCell.isRevealed && !adjacentCell.isFlagged) {
-                        this.revealCell(r, c);
-                    }
-                }
-            }
-        }
-    }
-    
-    updateDisplay() {
-        const config = this.difficulties[this.currentDifficulty];
-        const remainingMines = config.mines - this.flaggedCells;
-        const minePadding = this.currentDifficulty === 'extreme' ? 3 : 2;
-        this.mineCountDisplay.textContent = remainingMines.toString().padStart(minePadding, '0');
-        this.timerDisplay.textContent = this.timer.toString().padStart(3, '0');
-    }
-    
-    // 拡大縮小機能
-    zoomIn() {
-        if (this.zoomLevel < this.maxZoom) {
-            this.zoomLevel = Math.min(this.maxZoom, this.zoomLevel + this.zoomStep);
-            this.updateZoom();
-        }
-    }
-    
-    zoomOut() {
-        if (this.zoomLevel > this.minZoom) {
-            this.zoomLevel = Math.max(this.minZoom, this.zoomLevel - this.zoomStep);
-            this.updateZoom();
-        }
-    }
-    
-    zoomReset() {
-        this.zoomLevel = 1.0;
-        this.updateZoom();
-    }
-    
-    updateZoom() {
-        // ゲームボードの拡大縮小を適用
-        this.gameBoard.style.transform = `scale(${this.zoomLevel})`;
-        this.gameBoard.style.transformOrigin = 'top left';
-        
-        // ズームレベル表示を更新
-        this.zoomLevelDisplay.textContent = `${Math.round(this.zoomLevel * 100)}%`;
-        
-        // ズームレベルに応じてラッパーのpaddingを動的調整
-        const basePadding = 50;
-        const adjustedPadding = Math.max(basePadding, basePadding * this.zoomLevel);
-        this.gameBoardWrapper.style.padding = `${adjustedPadding}px`;
-        
-        // ズームボタンの有効/無効状態を更新
-        this.zoomInButton.disabled = this.zoomLevel >= this.maxZoom;
-        this.zoomOutButton.disabled = this.zoomLevel <= this.minZoom;
-    }
-    
-    // 確率計算機能
-    calculateProbabilities() {
-        const config = this.difficulties[this.currentDifficulty];
-        
-        // 確率配列を初期化
-        this.probabilities = [];
-        for (let row = 0; row < config.rows; row++) {
-            this.probabilities[row] = [];
-            for (let col = 0; col < config.cols; col++) {
-                // 初期値：すでに開いているセルは0、フラグ付きは1、未開封は-1
-                const cell = this.board[row][col];
-                if (cell.isRevealed) {
-                    this.probabilities[row][col] = 0;
-                } else if (cell.isFlagged) {
-                    this.probabilities[row][col] = 1;
-                } else {
-                    this.probabilities[row][col] = -1; // 計算対象
-                }
-            }
-        }
-        
-        // 制約条件を収集
-        const constraints = [];
-        for (let row = 0; row < config.rows; row++) {
-            for (let col = 0; col < config.cols; col++) {
-                const cell = this.board[row][col];
-                if (cell.isRevealed && !cell.isMine && cell.neighborMines > 0) {
-                    const constraint = {
-                        row: row,
-                        col: col,
-                        requiredMines: cell.neighborMines,
-                        unknownCells: [],
-                        flaggedCount: 0
-                    };
-                    
-                    // 周囲のセルを調査
-                    for (let r = Math.max(0, row - 1); r <= Math.min(config.rows - 1, row + 1); r++) {
-                        for (let c = Math.max(0, col - 1); c <= Math.min(config.cols - 1, col + 1); c++) {
-                            if (r !== row || c !== col) {
-                                const neighborCell = this.board[r][c];
-                                if (!neighborCell.isRevealed && !neighborCell.isFlagged) {
-                                    constraint.unknownCells.push({row: r, col: c});
-                                } else if (neighborCell.isFlagged) {
-                                    constraint.flaggedCount++;
-                                }
-                            }
-                        }
-                    }
-                    
-                    constraint.remainingMines = constraint.requiredMines - constraint.flaggedCount;
-                    if (constraint.unknownCells.length > 0) {
-                        constraints.push(constraint);
-                    }
-                }
-            }
-        }
-        
-        // 簡易的な確率計算
-        // まず確定的な状況を処理
-        let changed = true;
-        while (changed) {
-            changed = false;
-            
-            for (const constraint of constraints) {
-                // 全てのセルが爆弾の場合
-                if (constraint.remainingMines === constraint.unknownCells.length) {
-                    for (const cell of constraint.unknownCells) {
-                        if (this.probabilities[cell.row][cell.col] !== 1) {
-                            this.probabilities[cell.row][cell.col] = 1;
-                            changed = true;
-                        }
-                    }
-                }
-                // 爆弾が無い場合
-                else if (constraint.remainingMines === 0) {
-                    for (const cell of constraint.unknownCells) {
-                        if (this.probabilities[cell.row][cell.col] !== 0) {
-                            this.probabilities[cell.row][cell.col] = 0;
-                            changed = true;
-                        }
-                    }
-                }
-            }
-            
-            // 確定したセルを制約から除外
-            if (changed) {
-                for (const constraint of constraints) {
-                    constraint.unknownCells = constraint.unknownCells.filter(
-                        cell => this.probabilities[cell.row][cell.col] === -1
-                    );
-                    
-                    let confirmedMines = 0;
-                    for (let r = Math.max(0, constraint.row - 1); r <= Math.min(config.rows - 1, constraint.row + 1); r++) {
-                        for (let c = Math.max(0, constraint.col - 1); c <= Math.min(config.cols - 1, constraint.col + 1); c++) {
-                            if ((r !== constraint.row || c !== constraint.col) && 
-                                this.probabilities[r][c] === 1) {
-                                confirmedMines++;
-                            }
-                        }
-                    }
-                    constraint.remainingMines = constraint.requiredMines - confirmedMines;
-                }
-            }
-        }
-        
-        // 残りの未確定セルに対して簡易的な確率を計算
-        const totalUnknownCells = [];
-        let remainingMines = config.mines - this.flaggedCells;
-        
-        for (let row = 0; row < config.rows; row++) {
-            for (let col = 0; col < config.cols; col++) {
-                if (this.probabilities[row][col] === -1) {
-                    totalUnknownCells.push({row, col});
-                } else if (this.probabilities[row][col] === 1 && !this.board[row][col].isFlagged) {
-                    remainingMines--;
-                }
-            }
-        }
-        
-        // 制約に関わる未確定セルの確率を計算
-        for (const cell of totalUnknownCells) {
-            const relevantConstraints = constraints.filter(
-                c => c.unknownCells.some(u => u.row === cell.row && u.col === cell.col)
+    handleTouchMove(e) {
+        if (e.touches.length === 2) {
+            // ピンチズーム処理
+            e.preventDefault();
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            const currentDistance = Math.hypot(
+                touch2.clientX - touch1.clientX,
+                touch2.clientY - touch1.clientY
             );
             
-            if (relevantConstraints.length > 0) {
-                // 簡易的に、最も制約的な確率を採用
-                let maxProbability = 0;
-                for (const constraint of relevantConstraints) {
-                    const probability = constraint.remainingMines / constraint.unknownCells.length;
-                    maxProbability = Math.max(maxProbability, probability);
-                }
-                this.probabilities[cell.row][cell.col] = maxProbability;
-            } else {
-                // 制約に関わらないセルは全体の平均確率
-                this.probabilities[cell.row][cell.col] = remainingMines / totalUnknownCells.length;
-            }
-        }
-    }
-    
-    // ヒント表示機能
-    showHint() {
-        if (this.gameState !== 'playing' || this.firstClick) {
-            return;
-        }
-        
-        // 前のヒントハイライトをクリア
-        this.clearHintHighlight();
-        
-        // 高度な確率を計算
-        this.calculateAdvancedProbabilities();
-        
-        const config = this.difficulties[this.currentDifficulty];
-        let bestCells = [];
-        let bestType = null; // 'mine' or 'safe'
-        let calculationExplanation = []; // 計算式の説明
-        
-        // 確定爆弾を探す（確率1.0）
-        for (let row = 0; row < config.rows; row++) {
-            for (let col = 0; col < config.cols; col++) {
-                if (this.probabilities[row][col] === 1 && 
-                    !this.board[row][col].isFlagged && 
-                    !this.board[row][col].isRevealed) {
-                    bestCells.push({row, col});
-                    bestType = 'mine';
-                    
-                    // この確定爆弾がどのような制約から導かれたか調べる
-                    const adjacentConstraints = this.findAdjacentConstraints(row, col, config);
-                    for (const constraint of adjacentConstraints) {
-                        if (constraint.unknownCells.length === constraint.remainingMines) {
-                            calculationExplanation.push({
-                                type: 'certain_mine',
-                                cell: {row, col},
-                                reason: `数字${constraint.requiredMines}の周囲に未開封${constraint.unknownCells.length}マス、残り爆弾${constraint.remainingMines}個 → 全て爆弾確定`
-                            });
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        
-        // 確定爆弾が無い場合、確定安全セルを探す（確率0）
-        if (bestCells.length === 0) {
-            for (let row = 0; row < config.rows; row++) {
-                for (let col = 0; col < config.cols; col++) {
-                    if (this.probabilities[row][col] === 0 && 
-                        !this.board[row][col].isRevealed) {
-                        bestCells.push({row, col});
-                        bestType = 'safe';
-                        
-                        // この確定安全がどのような制約から導かれたか調べる
-                        const adjacentConstraints = this.findAdjacentConstraints(row, col, config);
-                        for (const constraint of adjacentConstraints) {
-                            if (constraint.remainingMines === 0) {
-                                calculationExplanation.push({
-                                    type: 'certain_safe',
-                                    cell: {row, col},
-                                    reason: `数字${constraint.requiredMines}の周囲で既に${constraint.flaggedCount}個フラグ設置済み → 残り全て安全`
-                                });
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        // それも無い場合、制約に関わるセルで最も確率の低いセルを探す
-        if (bestCells.length === 0) {
-            let minProbability = 1;
-            const constraints = [];
-            
-            // 制約を再収集
-            for (let row = 0; row < config.rows; row++) {
-                for (let col = 0; col < config.cols; col++) {
-                    const cell = this.board[row][col];
-                    if (cell.isRevealed && !cell.isMine && cell.neighborMines > 0) {
-                        const unknownNeighbors = [];
-                        for (let r = Math.max(0, row - 1); r <= Math.min(config.rows - 1, row + 1); r++) {
-                            for (let c = Math.max(0, col - 1); c <= Math.min(config.cols - 1, col + 1); c++) {
-                                if ((r !== row || c !== col) && !this.board[r][c].isRevealed && !this.board[r][c].isFlagged) {
-                                    unknownNeighbors.push({row: r, col: c});
-                                }
-                            }
-                        }
-                        if (unknownNeighbors.length > 0) {
-                            constraints.push({unknownCells: unknownNeighbors});
-                        }
-                    }
-                }
+            if (this.lastTouchDistance > 0) {
+                const scaleDelta = currentDistance / this.lastTouchDistance;
+                this.scale = Math.max(0.5, Math.min(3, this.scale * scaleDelta));
+                this.updateTransform();
             }
             
-            // 制約に関わるセルのみを対象にする
-            const constraintCells = new Set();
-            for (const constraint of constraints) {
-                for (const cell of constraint.unknownCells) {
-                    constraintCells.add(`${cell.row},${cell.col}`);
-                }
-            }
-            
-            for (let row = 0; row < config.rows; row++) {
-                for (let col = 0; col < config.cols; col++) {
-                    const prob = this.probabilities[row][col];
-                    const cellKey = `${row},${col}`;
-                    // 制約に関わるセルのみを対象
-                    if (constraintCells.has(cellKey) && prob > 0 && prob < 1 && !this.board[row][col].isRevealed) {
-                        if (prob < minProbability) {
-                            minProbability = prob;
-                            bestCells = [{row, col}];
-                        } else if (prob === minProbability) {
-                            bestCells.push({row, col});
-                        }
-                    }
-                }
-            }
-            
-            // 最低確率セルの計算式を説明
-            if (bestCells.length > 0) {
-                const bestCell = bestCells[0];
-                const adjacentConstraints = this.findAdjacentConstraints(bestCell.row, bestCell.col, config);
-                const constraintExplanations = [];
-                
-                // CSPベースの詳細な計算過程を取得
-                const detailedCalculation = this.getDetailedProbabilityCalculation(bestCell.row, bestCell.col, config);
-                
-                if (detailedCalculation) {
-                    calculationExplanation.push({
-                        type: 'lowest_probability_detailed',
-                        cell: bestCell,
-                        probability: minProbability,
-                        reason: detailedCalculation
-                    });
-                } else {
-                    // 簡易的な説明
-                    for (const constraint of adjacentConstraints) {
-                        const probability = constraint.remainingMines / constraint.unknownCells.length;
-                        constraintExplanations.push(`数字${constraint.requiredMines}から: ${constraint.remainingMines}個/${constraint.unknownCells.length}マス = ${Math.round(probability * 100)}%`);
-                    }
-                    
-                    calculationExplanation.push({
-                        type: 'lowest_probability',
-                        cell: bestCell,
-                        probability: minProbability,
-                        reason: constraintExplanations.join('、')
-                    });
-                }
-            }
-            
-            bestType = 'safe';
-        }
-        
-        // ハイライト表示
-        if (bestCells.length > 0) {
-            const highlightClass = bestType === 'mine' ? 'hint-mine' : 'hint-safe';
-            for (const cell of bestCells) {
-                this.board[cell.row][cell.col].element.classList.add(highlightClass);
-                this.hintHighlightedCells.push({
-                    row: cell.row, 
-                    col: cell.col, 
-                    class: highlightClass
-                });
-            }
-            
-            // メッセージ表示（計算式付き）
-            if (calculationExplanation.length > 0) {
-                const explanation = calculationExplanation[0];
-                if (bestType === 'mine') {
-                    this.showHintMessageWithCalculation('💡 赤く光っているマスは爆弾が確定しています！', explanation.reason);
-                } else if (this.probabilities[bestCells[0].row][bestCells[0].col] === 0) {
-                    this.showHintMessageWithCalculation('💡 緑に光っているマスは安全です！', explanation.reason);
-                } else {
-                    const probability = Math.round(this.probabilities[bestCells[0].row][bestCells[0].col] * 100);
-                    if (explanation.type === 'lowest_probability_detailed') {
-                        this.showHintMessageWithCalculation(`💡 緑に光っているマスは爆弾確率が最も低いです（${probability}%）`, explanation.reason);
-                    } else {
-                        this.showHintMessageWithCalculation(`💡 緑に光っているマスは爆弾確率が最も低いです（${probability}%）`, explanation.reason);
-                    }
-                }
-            } else {
-                // 計算式がない場合は通常のメッセージ
-                if (bestType === 'mine') {
-                    this.showHintMessage('💡 赤く光っているマスは爆弾が確定しています！');
-                } else if (this.probabilities[bestCells[0].row][bestCells[0].col] === 0) {
-                    this.showHintMessage('💡 緑に光っているマスは安全です！');
-                } else {
-                    const probability = Math.round(this.probabilities[bestCells[0].row][bestCells[0].col] * 100);
-                    this.showHintMessage(`💡 緑に光っているマスは爆弾確率が最も低いです（${probability}%）`);
-                }
-            }
-        } else {
-            this.showHintMessage('💡 ヒントが見つかりませんでした');
+            this.lastTouchDistance = currentDistance;
+        } else if (e.touches.length === 1 && this.isPanning) {
+            // パン処理
+            e.preventDefault();
+            this.translateX = e.touches[0].clientX - this.startX;
+            this.translateY = e.touches[0].clientY - this.startY;
+            this.updateTransform();
         }
     }
     
-    // ヒントメッセージ表示
-    showHintMessage(message) {
-        this.gameMessage.textContent = message;
-        this.gameMessage.className = 'game-message hint';
-        this.gameMessage.classList.remove('hidden');
-    }
-    
-    // 計算式付きヒントメッセージ表示
-    showHintMessageWithCalculation(message, calculation) {
-        // メッセージと計算式を組み合わせる
-        const fullMessage = `${message}\n計算式: ${calculation}`;
-        this.gameMessage.textContent = fullMessage;
-        this.gameMessage.className = 'game-message hint with-calculation';
-        this.gameMessage.classList.remove('hidden');
-    }
-    
-    // 特定のセルに隣接する制約を見つける
-    findAdjacentConstraints(targetRow, targetCol, config) {
-        const constraints = [];
-        
-        // 周囲の開かれた数字セルを探す
-        for (let row = Math.max(0, targetRow - 1); row <= Math.min(config.rows - 1, targetRow + 1); row++) {
-            for (let col = Math.max(0, targetCol - 1); col <= Math.min(config.cols - 1, targetCol + 1); col++) {
-                const cell = this.board[row][col];
-                if (cell.isRevealed && !cell.isMine && cell.neighborMines > 0) {
-                    const constraint = {
-                        row: row,
-                        col: col,
-                        requiredMines: cell.neighborMines,
-                        unknownCells: [],
-                        flaggedCount: 0
-                    };
-                    
-                    // この数字セルの周囲を調査
-                    for (let r = Math.max(0, row - 1); r <= Math.min(config.rows - 1, row + 1); r++) {
-                        for (let c = Math.max(0, col - 1); c <= Math.min(config.cols - 1, col + 1); c++) {
-                            if (r !== row || c !== col) {
-                                const neighborCell = this.board[r][c];
-                                if (!neighborCell.isRevealed && !neighborCell.isFlagged) {
-                                    constraint.unknownCells.push({row: r, col: c});
-                                } else if (neighborCell.isFlagged) {
-                                    constraint.flaggedCount++;
-                                }
-                            }
-                        }
-                    }
-                    
-                    constraint.remainingMines = constraint.requiredMines - constraint.flaggedCount;
-                    
-                    // ターゲットセルがこの制約に含まれているか確認
-                    if (constraint.unknownCells.some(cell => cell.row === targetRow && cell.col === targetCol)) {
-                        constraints.push(constraint);
-                    }
-                }
-            }
+    handleTouchEnd(e) {
+        if (e.touches.length < 2) {
+            this.lastTouchDistance = 0;
         }
-        
-        return constraints;
-    }
-    
-    // CSPベースの高度な確率計算
-    calculateAdvancedProbabilities() {
-        const config = this.difficulties[this.currentDifficulty];
-        this.calculateProbabilities(); // まず基本的な確率計算を実行
-        
-        // 制約のグループを特定
-        const constraintGroups = this.findConstraintGroups(config);
-        
-        // 各グループについて可能な配置を列挙
-        for (const group of constraintGroups) {
-            if (group.unknownCells.size <= 20) { // 計算量を抑えるため
-                const probabilities = this.calculateGroupProbabilities(group, config);
-                
-                // グループの確率を更新
-                for (const [cellKey, probability] of probabilities) {
-                    const [row, col] = cellKey.split(',').map(Number);
-                    this.probabilities[row][col] = probability;
-                }
-            }
+        if (e.touches.length === 0) {
+            this.isPanning = false;
         }
     }
     
-    // 制約のグループを見つける（相互に影響し合う制約をグループ化）
-    findConstraintGroups(config) {
-        const groups = [];
-        const visited = new Set();
-        
-        // 全ての数字セルから制約を作成
-        const allConstraints = [];
-        for (let row = 0; row < config.rows; row++) {
-            for (let col = 0; col < config.cols; col++) {
-                const cell = this.board[row][col];
-                if (cell.isRevealed && !cell.isMine && cell.neighborMines > 0) {
-                    const constraint = this.createConstraint(row, col, config);
-                    if (constraint.unknownCells.length > 0) {
-                        allConstraints.push(constraint);
-                    }
-                }
-            }
-        }
-        
-        // 制約をグループ化
-        for (const constraint of allConstraints) {
-            const constraintKey = `${constraint.row},${constraint.col}`;
-            if (!visited.has(constraintKey)) {
-                const group = this.findConnectedConstraints(constraint, allConstraints, visited);
-                groups.push(group);
-            }
-        }
-        
-        return groups;
+    
+    updateTransform() {
+        const gameBoard = document.getElementById('gameBoard');
+        gameBoard.style.transform = `translate(${this.translateX}px, ${this.translateY}px) scale(${this.scale})`;
     }
     
-    // 接続された制約を見つける（DFS）
-    findConnectedConstraints(startConstraint, allConstraints, visited) {
-        const group = {
-            constraints: [],
-            unknownCells: new Set()
-        };
-        
-        const stack = [startConstraint];
-        
-        while (stack.length > 0) {
-            const current = stack.pop();
-            const key = `${current.row},${current.col}`;
-            
-            if (visited.has(key)) continue;
-            visited.add(key);
-            
-            group.constraints.push(current);
-            current.unknownCells.forEach(cell => {
-                group.unknownCells.add(`${cell.row},${cell.col}`);
-            });
-            
-            // 共通の未開封セルを持つ制約を探す
-            for (const other of allConstraints) {
-                const otherKey = `${other.row},${other.col}`;
-                if (!visited.has(otherKey)) {
-                    const hasCommonCell = current.unknownCells.some(cell1 =>
-                        other.unknownCells.some(cell2 => 
-                            cell1.row === cell2.row && cell1.col === cell2.col
-                        )
-                    );
-                    if (hasCommonCell) {
-                        stack.push(other);
-                    }
-                }
-            }
-        }
-        
-        return group;
-    }
-    
-    // 制約を作成
-    createConstraint(row, col, config) {
-        const constraint = {
-            row: row,
-            col: col,
-            requiredMines: this.board[row][col].neighborMines,
-            unknownCells: [],
-            flaggedCount: 0
-        };
-        
-        // 周囲のセルを調査
-        for (let r = Math.max(0, row - 1); r <= Math.min(config.rows - 1, row + 1); r++) {
-            for (let c = Math.max(0, col - 1); c <= Math.min(config.cols - 1, col + 1); c++) {
-                if (r !== row || c !== col) {
-                    const neighborCell = this.board[r][c];
-                    if (!neighborCell.isRevealed && !neighborCell.isFlagged) {
-                        constraint.unknownCells.push({row: r, col: c});
-                    } else if (neighborCell.isFlagged) {
-                        constraint.flaggedCount++;
-                    }
-                }
-            }
-        }
-        
-        constraint.remainingMines = constraint.requiredMines - constraint.flaggedCount;
-        return constraint;
-    }
-    
-    // グループ内の確率を計算（全ての可能な配置を列挙）
-    calculateGroupProbabilities(group, config) {
-        const cellArray = Array.from(group.unknownCells);
-        const validConfigurations = [];
-        const cellCount = cellArray.length;
-        
-        // 2^n の全ての組み合わせを試す（nが大きい場合は制限）
-        const maxConfigurations = Math.pow(2, cellCount);
-        for (let i = 0; i < maxConfigurations; i++) {
-            const configuration = [];
-            for (let j = 0; j < cellCount; j++) {
-                configuration.push((i >> j) & 1);
-            }
-            
-            // この配置が全ての制約を満たすか確認
-            if (this.isValidConfiguration(configuration, cellArray, group.constraints)) {
-                validConfigurations.push(configuration);
-            }
-        }
-        
-        // 各セルの確率を計算
-        const probabilities = new Map();
-        if (validConfigurations.length > 0) {
-            for (let i = 0; i < cellCount; i++) {
-                const cellKey = cellArray[i];
-                const mineCount = validConfigurations.reduce((sum, config) => sum + config[i], 0);
-                probabilities.set(cellKey, mineCount / validConfigurations.length);
-            }
-        }
-        
-        return probabilities;
-    }
-    
-    // 配置が全ての制約を満たすか確認
-    isValidConfiguration(configuration, cellArray, constraints) {
-        const cellMap = new Map();
-        for (let i = 0; i < cellArray.length; i++) {
-            cellMap.set(cellArray[i], configuration[i]);
-        }
-        
-        for (const constraint of constraints) {
-            let mineCount = 0;
-            for (const cell of constraint.unknownCells) {
-                const cellKey = `${cell.row},${cell.col}`;
-                if (cellMap.has(cellKey)) {
-                    mineCount += cellMap.get(cellKey);
-                }
-            }
-            
-            if (mineCount !== constraint.remainingMines) {
-                return false;
-            }
-        }
-        
-        return true;
-    }
-    
-    // 詳細な確率計算過程を取得
-    getDetailedProbabilityCalculation(targetRow, targetCol, config) {
-        // ターゲットセルを含む制約グループを見つける
-        const constraintGroups = this.findConstraintGroups(config);
-        let targetGroup = null;
-        const targetKey = `${targetRow},${targetCol}`;
-        
-        for (const group of constraintGroups) {
-            if (group.unknownCells.has(targetKey)) {
-                targetGroup = group;
-                break;
-            }
-        }
-        
-        if (!targetGroup || targetGroup.unknownCells.size > 15) {
-            return null; // グループが大きすぎる場合は簡易表示
-        }
-        
-        // 可能な配置を列挙
-        const cellArray = Array.from(targetGroup.unknownCells);
-        const validConfigurations = [];
-        const cellCount = cellArray.length;
-        
-        const maxConfigurations = Math.pow(2, cellCount);
-        for (let i = 0; i < maxConfigurations; i++) {
-            const configuration = [];
-            for (let j = 0; j < cellCount; j++) {
-                configuration.push((i >> j) & 1);
-            }
-            
-            if (this.isValidConfiguration(configuration, cellArray, targetGroup.constraints)) {
-                validConfigurations.push(configuration);
-            }
-        }
-        
-        // ターゲットセルのインデックスを見つける
-        const targetIndex = cellArray.indexOf(targetKey);
-        const mineCount = validConfigurations.reduce((sum, config) => sum + config[targetIndex], 0);
-        const probability = mineCount / validConfigurations.length;
-        
-        // 詳細な説明を作成
-        let explanation = `【詳細計算過程】\n`;
-        explanation += `関連する制約:\n`;
-        
-        // 各制約を説明
-        for (const constraint of targetGroup.constraints) {
-            const cell = this.board[constraint.row][constraint.col];
-            explanation += `・(${constraint.row + 1}, ${constraint.col + 1})の数字${cell.neighborMines}: `;
-            explanation += `未開封${constraint.unknownCells.length}マスに爆弾${constraint.remainingMines}個\n`;
-        }
-        
-        explanation += `\n制約を満たす配置パターン: ${validConfigurations.length}通り\n`;
-        explanation += `このマスが爆弾である配置: ${mineCount}通り\n`;
-        explanation += `確率計算: ${mineCount}/${validConfigurations.length} = ${Math.round(probability * 100)}%`;
-        
-        // 配置パターンの表示（最大10個、または全て表示可能な場合は全て）
-        if (validConfigurations.length <= 10) {
-            explanation += `\n\n【${validConfigurations.length <= 5 ? '全ての' : ''}有効な配置】\n`;
-            validConfigurations.forEach((config, idx) => {
-                explanation += `パターン${idx + 1}: `;
-                const pattern = cellArray.map((cell, i) => {
-                    const [r, c] = cell.split(',').map(Number);
-                    return `(${r + 1},${c + 1})=${config[i] ? '💣' : '✓'}`;
-                }).join(' ');
-                explanation += pattern + '\n';
-            });
-        } else {
-            // 配置パターンが多い場合は一部のみ表示
-            explanation += `\n\n【有効な配置の例（${validConfigurations.length}通り中10個）】\n`;
-            for (let idx = 0; idx < 10; idx++) {
-                const config = validConfigurations[idx];
-                explanation += `パターン${idx + 1}: `;
-                const pattern = cellArray.map((cell, i) => {
-                    const [r, c] = cell.split(',').map(Number);
-                    return `(${r + 1},${c + 1})=${config[i] ? '💣' : '✓'}`;
-                }).join(' ');
-                explanation += pattern + '\n';
-            }
-        }
-        
-        return explanation;
-    }
-    
-    // ヒントハイライトをクリア
-    clearHintHighlight() {
-        if (!this.board || this.board.length === 0) {
-            this.hintHighlightedCells = [];
-            return;
-        }
-        
-        for (const highlighted of this.hintHighlightedCells) {
-            const cell = this.board[highlighted.row]?.[highlighted.col];
-            if (cell && cell.element) {
-                cell.element.classList.remove(highlighted.class);
-            }
-        }
-        this.hintHighlightedCells = [];
-    }
-    
-    // 統計モードのトグル
-    toggleStatsMode() {
-        if (this.gameState !== 'playing' || this.firstClick) {
-            return;
-        }
-        
-        this.statsMode = !this.statsMode;
-        this.statsButton.classList.toggle('active', this.statsMode);
-        
-        if (this.statsMode) {
-            this.showStatsMode();
-        } else {
-            this.clearStatsMode();
-        }
-    }
-    
-    // 統計モード表示
-    showStatsMode() {
-        // 高度な確率を計算
-        this.calculateAdvancedProbabilities();
-        
-        const config = this.difficulties[this.currentDifficulty];
-        
-        // 全てのセルに確率を表示
-        for (let row = 0; row < config.rows; row++) {
-            for (let col = 0; col < config.cols; col++) {
-                const cell = this.board[row][col];
-                if (!cell.isRevealed && !cell.isFlagged) {
-                    const probability = this.probabilities[row][col];
-                    if (probability >= 0) {
-                        // 確率をパーセンテージで表示
-                        const percentage = Math.round(probability * 100);
-                        cell.element.classList.add('stats-mode');
-                        cell.element.setAttribute('data-probability', `${percentage}%`);
-                    }
-                }
-            }
-        }
-        
-        // メッセージ表示（ヒント計算メッセージが表示されていない場合のみ）
-        if (!this.gameMessage.classList.contains('with-calculation')) {
-            this.showStatsModeMessage('📊 統計モード: 各マスの爆弾確率を表示中');
-        }
-    }
-    
-    // 統計モードをクリア
-    clearStatsMode() {
-        const config = this.difficulties[this.currentDifficulty];
-        
-        for (let row = 0; row < config.rows; row++) {
-            for (let col = 0; col < config.cols; col++) {
-                const cell = this.board[row][col];
-                if (cell.element) {
-                    cell.element.classList.remove('stats-mode');
-                    cell.element.removeAttribute('data-probability');
-                }
-            }
-        }
-        
-        this.statsMode = false;
-        this.statsButton.classList.remove('active');
-    }
-    
-    // 統計モードメッセージ表示
-    showStatsModeMessage(message) {
-        this.gameMessage.textContent = message;
-        this.gameMessage.className = 'game-message hint';
-        this.gameMessage.classList.remove('hidden');
-    }
-    
-    // セルの状態が変化したときに統計モードを更新
-    updateStatsModeIfActive() {
-        if (this.statsMode) {
-            this.showStatsMode();
-        }
-    }
-    
-    // 確率分析ビューを表示
-    showProbabilityView() {
-        if (this.gameState !== 'playing' || this.firstClick) {
-            return;
-        }
-        
-        // 高度な確率を計算
-        this.calculateAdvancedProbabilities();
-        
-        const config = this.difficulties[this.currentDifficulty];
-        this.probabilityBoard.innerHTML = '';
-        
-        // セルサイズを設定
-        const cellSize = this.currentDifficulty === 'extreme' ? '20px' : '40px';
-        this.probabilityBoard.style.gridTemplateColumns = `repeat(${config.cols}, ${cellSize})`;
-        this.probabilityBoard.style.gridTemplateRows = `repeat(${config.rows}, ${cellSize})`;
-        
-        // 盤面を複製して確率を表示
-        for (let row = 0; row < config.rows; row++) {
-            for (let col = 0; col < config.cols; col++) {
-                const cell = this.board[row][col];
-                const cellDiv = document.createElement('div');
-                cellDiv.className = 'probability-cell';
-                
-                if (cell.isRevealed) {
-                    cellDiv.classList.add('revealed');
-                    if (!cell.isMine && cell.neighborMines > 0) {
-                        const content = document.createElement('div');
-                        content.className = 'cell-content';
-                        content.textContent = cell.neighborMines;
-                        content.classList.add(`number-${cell.neighborMines}`);
-                        cellDiv.appendChild(content);
-                    }
-                } else if (cell.isFlagged) {
-                    cellDiv.classList.add('flagged');
-                    cellDiv.textContent = '🚩';
-                } else {
-                    // 未開封セルの確率を表示
-                    const probability = this.probabilities[row][col];
-                    if (probability >= 0) {
-                        const percentage = Math.round(probability * 100);
-                        
-                        // 確率に応じて色分け
-                        if (probability === 0) {
-                            cellDiv.classList.add('probability-0');
-                        } else if (probability === 1) {
-                            cellDiv.classList.add('probability-100');
-                        } else if (probability < 0.25) {
-                            cellDiv.classList.add('probability-low');
-                        } else if (probability < 0.5) {
-                            cellDiv.classList.add('probability-medium');
-                        } else {
-                            cellDiv.classList.add('probability-high');
-                        }
-                        
-                        const probText = document.createElement('div');
-                        probText.className = 'probability-text';
-                        probText.textContent = `${percentage}%`;
-                        cellDiv.appendChild(probText);
-                    }
-                }
-                
-                this.probabilityBoard.appendChild(cellDiv);
-            }
-        }
-        
-        // ビューを表示
-        this.probabilityView.classList.remove('hidden');
-    }
-    
-    // 確率分析ビューを非表示
-    hideProbabilityView() {
-        this.probabilityView.classList.add('hidden');
+    resetZoom() {
+        this.scale = 1;
+        this.translateX = 0;
+        this.translateY = 0;
+        this.updateTransform();
     }
 }
 
-// ゲーム開始
 document.addEventListener('DOMContentLoaded', () => {
     new Minesweeper();
-}); 
+});
