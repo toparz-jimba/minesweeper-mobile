@@ -61,8 +61,9 @@ h1 {
 .game-info {
     display: flex;
     justify-content: center;
-    gap: 30px;
-    margin-bottom: 15px;
+    align-items: center;
+    gap: 15px;
+    margin-top: 10px;
 }
 
 .info-item {
@@ -164,7 +165,7 @@ h1 {
     justify-content: center;
     gap: 8px;
     flex-wrap: wrap;
-    margin-top: 15px;
+    margin: 12px 0;
 }
 
 .difficulty-select {

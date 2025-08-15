@@ -152,7 +152,7 @@ class Minesweeper {
             gameBoard.classList.add('game-over');
         }
         
-        const cellSize = this.cols > 50 ? '12px' : this.cols > 20 ? '20px' : this.cols > 10 ? '25px' : '35px';
+        const cellSize = '35px';
         gameBoard.style.gridTemplateColumns = `repeat(${this.cols}, ${cellSize})`;
         gameBoard.style.gridTemplateRows = `repeat(${this.rows}, ${cellSize})`;
         
@@ -184,6 +184,26 @@ class Minesweeper {
     }
     
     setupCellEventListeners(cell, row, col) {
+        // マウスイベント
+        cell.addEventListener('click', (e) => {
+            if (e.shiftKey || e.ctrlKey) {
+                this.handleRightClick(row, col);
+            } else {
+                this.handleLeftClick(row, col);
+            }
+        });
+        
+        cell.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            this.handleRightClick(row, col);
+        });
+        
+        cell.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+            this.handleDoubleClick(row, col);
+        });
+        
+        // タッチイベント
         let touchStartX, touchStartY;
         let longPressTriggered = false;
         let lastTapTime = 0;
@@ -231,7 +251,6 @@ class Minesweeper {
         cell.addEventListener('touchmove', () => {
             clearTimeout(this.touchTimer);
         });
-        
     }
     
     handleLeftClick(row, col) {
@@ -448,12 +467,7 @@ class Minesweeper {
     }
     
     resetZoom() {
-        // 極悪モードの場合は初期スケールを小さくする
-        if (this.cols === 64) {
-            this.scale = 0.5;
-        } else {
-            this.scale = 1;
-        }
+        this.scale = 1;
         this.translateX = 0;
         this.translateY = 0;
         this.updateTransform();

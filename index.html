@@ -15,6 +15,19 @@
     <div class="ui-container">
         <header>
             <h1>マインスイーパー</h1>
+            
+            <div class="controls">
+                <select id="difficultySelect" class="difficulty-select">
+                    <option value="easy">簡単 (9×9)</option>
+                    <option value="medium" selected>普通 (16×16)</option>
+                    <option value="hard">難しい (16×30)</option>
+                    <option value="backEasy">裏初級 (9×9)</option>
+                    <option value="backMedium">裏中級 (16×16)</option>
+                    <option value="backHard">裏上級 (16×30)</option>
+                    <option value="extreme">極悪 (64×64)</option>
+                </select>
+            </div>
+            
             <div class="game-info">
                 <div class="info-item">
                     <span class="label">💣</span>
@@ -28,21 +41,9 @@
                     <span class="label">⏱</span>
                     <span id="timer">0</span>
                 </div>
+                <button id="resetBtn" class="reset-btn">リセット 😊</button>
             </div>
-            <button id="resetBtn" class="reset-btn">リセット 😊</button>
         </header>
-        
-        <div class="controls">
-            <select id="difficultySelect" class="difficulty-select">
-                <option value="easy">簡単 (9×9)</option>
-                <option value="medium" selected>普通 (16×16)</option>
-                <option value="hard">難しい (16×30)</option>
-                <option value="backEasy">裏初級 (9×9)</option>
-                <option value="backMedium">裏中級 (16×16)</option>
-                <option value="backHard">裏上級 (16×30)</option>
-                <option value="extreme">極悪 (64×64)</option>
-            </select>
-        </div>
     </div>
     
     <div class="board-container">
