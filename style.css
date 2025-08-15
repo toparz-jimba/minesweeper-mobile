@@ -162,7 +162,7 @@ h1 {
 .controls {
     display: flex;
     justify-content: center;
-    gap: 10px;
+    gap: 8px;
     flex-wrap: wrap;
     margin-top: 15px;
 }
@@ -171,9 +171,9 @@ h1 {
     background: #3a3a3a;
     color: #b0b0b0;
     border: 2px solid #4a4a4a;
-    padding: 8px 18px;
+    padding: 6px 12px;
     border-radius: 20px;
-    font-size: 14px;
+    font-size: 13px;
     transition: all 0.2s;
     -webkit-tap-highlight-color: transparent;
 }

@@ -34,6 +34,10 @@ class Minesweeper {
         document.getElementById('easyBtn').addEventListener('click', () => this.setDifficulty('easy'));
         document.getElementById('mediumBtn').addEventListener('click', () => this.setDifficulty('medium'));
         document.getElementById('hardBtn').addEventListener('click', () => this.setDifficulty('hard'));
+        document.getElementById('backEasyBtn').addEventListener('click', () => this.setDifficulty('backEasy'));
+        document.getElementById('backMediumBtn').addEventListener('click', () => this.setDifficulty('backMedium'));
+        document.getElementById('backHardBtn').addEventListener('click', () => this.setDifficulty('backHard'));
+        document.getElementById('extremeBtn').addEventListener('click', () => this.setDifficulty('extreme'));
         
         // ズーム・パン機能のイベントリスナー（モバイル専用）
         const viewport = document.querySelector('.board-viewport');
@@ -65,6 +69,30 @@ class Minesweeper {
                 this.cols = 30;
                 this.mines = 99;
                 document.getElementById('hardBtn').classList.add('active');
+                break;
+            case 'backEasy':
+                this.rows = 9;
+                this.cols = 9;
+                this.mines = 20;
+                document.getElementById('backEasyBtn').classList.add('active');
+                break;
+            case 'backMedium':
+                this.rows = 16;
+                this.cols = 16;
+                this.mines = 64;
+                document.getElementById('backMediumBtn').classList.add('active');
+                break;
+            case 'backHard':
+                this.rows = 16;
+                this.cols = 30;
+                this.mines = 120;
+                document.getElementById('backHardBtn').classList.add('active');
+                break;
+            case 'extreme':
+                this.rows = 64;
+                this.cols = 64;
+                this.mines = 999;
+                document.getElementById('extremeBtn').classList.add('active');
                 break;
         }
         
@@ -139,7 +167,7 @@ class Minesweeper {
             gameBoard.classList.add('game-over');
         }
         
-        const cellSize = this.cols > 20 ? '20px' : this.cols > 10 ? '25px' : '35px';
+        const cellSize = this.cols > 50 ? '12px' : this.cols > 20 ? '20px' : this.cols > 10 ? '25px' : '35px';
         gameBoard.style.gridTemplateColumns = `repeat(${this.cols}, ${cellSize})`;
         gameBoard.style.gridTemplateRows = `repeat(${this.rows}, ${cellSize})`;
         
@@ -435,7 +463,12 @@ class Minesweeper {
     }
     
     resetZoom() {
-        this.scale = 1;
+        // 極悪モードの場合は初期スケールを小さくする
+        if (this.cols === 64) {
+            this.scale = 0.5;
+        } else {
+            this.scale = 1;
+        }
         this.translateX = 0;
         this.translateY = 0;
         this.updateTransform();
