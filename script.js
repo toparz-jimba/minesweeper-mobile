@@ -92,6 +92,7 @@ class Minesweeper {
         this.timer = 0;
         
         clearInterval(this.timerInterval);
+        this.timerInterval = null;
         
         document.getElementById('resetBtn').textContent = 'リセット 😊';
         document.getElementById('mineCount').textContent = this.mines;
@@ -260,7 +261,7 @@ class Minesweeper {
         
         if (cell.isFlagged || cell.isRevealed) return;
         
-        if (this.timer === 0) {
+        if (this.timer === 0 && this.timerInterval === null) {
             this.startTimer();
         }
         
@@ -290,6 +291,7 @@ class Minesweeper {
             }
         }
         
+        document.getElementById('mineCount').textContent = this.mines - this.flagCount;
         document.getElementById('flagCount').textContent = this.flagCount;
         this.renderBoard();
     }
@@ -377,6 +379,7 @@ class Minesweeper {
     endGame(won) {
         this.gameOver = true;
         clearInterval(this.timerInterval);
+        this.timerInterval = null;
         
         if (won) {
             document.getElementById('resetBtn').textContent = 'リセット 😎';
