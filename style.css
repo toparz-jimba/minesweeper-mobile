@@ -75,6 +75,30 @@ h1 {
     color: #b0b0b0;
 }
 
+.flag-counter {
+    position: relative;
+}
+
+.flag-max {
+    font-size: 14px;
+    color: #808080;
+    margin-left: 2px;
+}
+
+/* 旗の数が最大に近づいた時の警告色 */
+.flag-counter.warning .flag-max {
+    color: #ffa726;
+}
+
+.flag-counter.max-reached {
+}
+
+.flag-counter.max-reached .flag-max {
+    color: #ff5252;
+    font-weight: bold;
+}
+
+
 .label {
     font-size: 20px;
 }
@@ -86,7 +110,6 @@ h1 {
     padding: 10px 25px;
     border-radius: 25px;
     font-size: 16px;
-    transition: transform 0.2s;
     -webkit-tap-highlight-color: transparent;
 }
 
@@ -104,7 +127,6 @@ h1 {
     user-select: none;
     -webkit-user-select: none;
     transform-origin: center center;
-    transition: transform 0.2s ease-out;
 }
 
 .cell {
@@ -115,16 +137,12 @@ h1 {
     align-items: center;
     font-weight: bold;
     font-size: 14px;
-    transition: all 0.1s;
     aspect-ratio: 1;
     color: #f0f0f0;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
 }
 
-.cell:active {
-    transform: scale(0.95);
-}
 
 .cell.revealed {
     background: #2a2a2a;
@@ -145,6 +163,7 @@ h1 {
     content: "🚩";
     font-size: 16px;
 }
+
 
 .cell.mine.revealed::before {
     content: "💣";
@@ -175,7 +194,6 @@ h1 {
     padding: 8px 16px;
     border-radius: 20px;
     font-size: 14px;
-    transition: all 0.2s;
     -webkit-tap-highlight-color: transparent;
     appearance: none;
     -webkit-appearance: none;

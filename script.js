@@ -97,7 +97,12 @@ class Minesweeper {
         document.getElementById('resetBtn').textContent = 'リセット 😊';
         document.getElementById('mineCount').textContent = this.mines;
         document.getElementById('flagCount').textContent = '0';
+        document.getElementById('maxFlags').textContent = this.mines;
         document.getElementById('timer').textContent = '0';
+        
+        // 旗カウンターの状態をリセット
+        const flagCounter = document.querySelector('.flag-counter');
+        flagCounter.classList.remove('warning', 'max-reached');
         
         this.resetZoom();
         this.createBoard();
@@ -218,7 +223,10 @@ class Minesweeper {
             this.touchTimer = setTimeout(() => {
                 longPressTriggered = true;
                 this.handleRightClick(row, col);
-                navigator.vibrate && navigator.vibrate(50);
+                // 旗を立てた時により強いバイブレーションフィードバック
+                if (navigator.vibrate) {
+                    navigator.vibrate([50, 30, 50]); // パターンバイブレーション
+                }
             }, 500);
         });
         
@@ -293,6 +301,20 @@ class Minesweeper {
         
         document.getElementById('mineCount').textContent = this.mines - this.flagCount;
         document.getElementById('flagCount').textContent = this.flagCount;
+        document.getElementById('maxFlags').textContent = this.mines;
+        
+        // 旗カウンターの状態を更新
+        const flagCounter = document.querySelector('.flag-counter');
+        if (this.flagCount === this.mines) {
+            flagCounter.classList.add('max-reached');
+            flagCounter.classList.remove('warning');
+        } else if (this.flagCount >= this.mines * 0.8) {
+            flagCounter.classList.add('warning');
+            flagCounter.classList.remove('max-reached');
+        } else {
+            flagCounter.classList.remove('warning', 'max-reached');
+        }
+        
         this.renderBoard();
     }
     
