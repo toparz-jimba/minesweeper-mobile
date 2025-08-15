@@ -31,13 +31,7 @@ class Minesweeper {
     
     setupEventListeners() {
         document.getElementById('resetBtn').addEventListener('click', () => this.resetGame());
-        document.getElementById('easyBtn').addEventListener('click', () => this.setDifficulty('easy'));
-        document.getElementById('mediumBtn').addEventListener('click', () => this.setDifficulty('medium'));
-        document.getElementById('hardBtn').addEventListener('click', () => this.setDifficulty('hard'));
-        document.getElementById('backEasyBtn').addEventListener('click', () => this.setDifficulty('backEasy'));
-        document.getElementById('backMediumBtn').addEventListener('click', () => this.setDifficulty('backMedium'));
-        document.getElementById('backHardBtn').addEventListener('click', () => this.setDifficulty('backHard'));
-        document.getElementById('extremeBtn').addEventListener('click', () => this.setDifficulty('extreme'));
+        document.getElementById('difficultySelect').addEventListener('change', (e) => this.setDifficulty(e.target.value));
         
         // ズーム・パン機能のイベントリスナー（モバイル専用）
         const viewport = document.querySelector('.board-viewport');
@@ -49,50 +43,41 @@ class Minesweeper {
     }
     
     setDifficulty(level) {
-        document.querySelectorAll('.difficulty-btn').forEach(btn => btn.classList.remove('active'));
-        
         switch(level) {
             case 'easy':
                 this.rows = 9;
                 this.cols = 9;
                 this.mines = 10;
-                document.getElementById('easyBtn').classList.add('active');
                 break;
             case 'medium':
                 this.rows = 16;
                 this.cols = 16;
                 this.mines = 40;
-                document.getElementById('mediumBtn').classList.add('active');
                 break;
             case 'hard':
                 this.rows = 16;
                 this.cols = 30;
                 this.mines = 99;
-                document.getElementById('hardBtn').classList.add('active');
                 break;
             case 'backEasy':
                 this.rows = 9;
                 this.cols = 9;
                 this.mines = 20;
-                document.getElementById('backEasyBtn').classList.add('active');
                 break;
             case 'backMedium':
                 this.rows = 16;
                 this.cols = 16;
                 this.mines = 64;
-                document.getElementById('backMediumBtn').classList.add('active');
                 break;
             case 'backHard':
                 this.rows = 16;
                 this.cols = 30;
                 this.mines = 120;
-                document.getElementById('backHardBtn').classList.add('active');
                 break;
             case 'extreme':
                 this.rows = 64;
                 this.cols = 64;
                 this.mines = 999;
-                document.getElementById('extremeBtn').classList.add('active');
                 break;
         }
         

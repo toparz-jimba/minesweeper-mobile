@@ -33,13 +33,15 @@
         </header>
         
         <div class="controls">
-            <button id="easyBtn" class="difficulty-btn">簡単 (9×9)</button>
-            <button id="mediumBtn" class="difficulty-btn active">普通 (16×16)</button>
-            <button id="hardBtn" class="difficulty-btn">難しい (16×30)</button>
-            <button id="backEasyBtn" class="difficulty-btn">裏初級 (9×9)</button>
-            <button id="backMediumBtn" class="difficulty-btn">裏中級 (16×16)</button>
-            <button id="backHardBtn" class="difficulty-btn">裏上級 (16×30)</button>
-            <button id="extremeBtn" class="difficulty-btn">極悪 (64×64)</button>
+            <select id="difficultySelect" class="difficulty-select">
+                <option value="easy">簡単 (9×9)</option>
+                <option value="medium" selected>普通 (16×16)</option>
+                <option value="hard">難しい (16×30)</option>
+                <option value="backEasy">裏初級 (9×9)</option>
+                <option value="backMedium">裏中級 (16×16)</option>
+                <option value="backHard">裏上級 (16×30)</option>
+                <option value="extreme">極悪 (64×64)</option>
+            </select>
         </div>
     </div>
     
