@@ -333,15 +333,22 @@ class MinesweeperCanvas {
         this.touchStartY = touch.clientY;
         this.touchMoved = false;
         
+        // 長押しタイマーをクリア
+        if (this.longPressTimer) {
+            clearTimeout(this.longPressTimer);
+            this.longPressTimer = null;
+        }
+        
         // 1本指の場合、現在のターゲット位置を記録
         if (e.touches.length === 1) {
             this.lastPanX = this.targetTranslateX;
             this.lastPanY = this.targetTranslateY;
+            this.isPanning = false;  // 1本指の時はパンニング状態を解除
         }
         
         // 2本指でのピンチズーム検出
         if (e.touches.length === 2) {
-            this.isPanning = true;
+            this.isPanning = true;  // 2本指の時はピンチモード
             const touch2 = e.touches[1];
             this.initialPinchDistance = Math.hypot(
                 touch2.clientX - touch.clientX,
@@ -359,6 +366,9 @@ class MinesweeperCanvas {
             // 現在のパン位置を記録
             this.lastPanX = this.translateX;
             this.lastPanY = this.translateY;
+            
+            // 2本指の時は旗を立てない
+            this.pressedCell = null;
             return;
         }
         
@@ -369,21 +379,24 @@ class MinesweeperCanvas {
         if (cell) {
             this.pressedCell = cell;
             
-            // 長押し検出（旗を立てる）
-            this.longPressTimer = setTimeout(() => {
-                if (this.pressedCell && 
-                    this.pressedCell.row === cell.row && 
-                    this.pressedCell.col === cell.col &&
-                    !this.touchMoved) {
-                    this.toggleFlag(cell.row, cell.col);
-                    this.pressedCell = null;
-                    
-                    // 振動フィードバック
-                    if (navigator.vibrate) {
-                        navigator.vibrate([20, 10, 20]);
+            // 1本指の時のみ長押し検出（旗を立てる）
+            if (e.touches.length === 1) {
+                this.longPressTimer = setTimeout(() => {
+                    if (this.pressedCell && 
+                        this.pressedCell.row === cell.row && 
+                        this.pressedCell.col === cell.col &&
+                        !this.touchMoved &&
+                        !this.isPanning) {  // ピンチ中でないことを確認
+                        this.toggleFlag(cell.row, cell.col);
+                        this.pressedCell = null;
+                        
+                        // 振動フィードバック
+                        if (navigator.vibrate) {
+                            navigator.vibrate([20, 10, 20]);
+                        }
                     }
-                }
-            }, 300); // 300msに変更
+                }, 300); // 300msに変更
+            }
         }
     }
     
@@ -392,8 +405,8 @@ class MinesweeperCanvas {
         
         const touch = e.touches[0];
         
-        // 1本指のパン移動
-        if (e.touches.length === 1 && !this.isPanning) {
+        // 1本指のパン移動（isPanningをチェックしない）
+        if (e.touches.length === 1) {
             const deltaX = touch.clientX - this.touchStartX;
             const deltaY = touch.clientY - this.touchStartY;
             const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
