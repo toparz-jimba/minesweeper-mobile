@@ -246,6 +246,7 @@ class MinesweeperCanvas {
         if (this.isPanning) {
             const deltaX = e.clientX - this.panStartX;
             const deltaY = e.clientY - this.panStartY;
+            // マウスの場合は指と同じ方向（ドラッグ＆ドロップの感覚）
             this.targetTranslateX = this.lastPanX + deltaX;
             this.targetTranslateY = this.lastPanY + deltaY;
             this.constrainPan();
@@ -422,10 +423,11 @@ class MinesweeperCanvas {
                 }
             }
             
-            // スワイプ中は常にパン移動を更新
+            // スワイプ中は常にパン移動を更新（方向を反転）
             if (this.touchMoved || distance > this.touchMoveThreshold) {
-                this.targetTranslateX = this.lastPanX + deltaX;
-                this.targetTranslateY = this.lastPanY + deltaY;
+                // 指の動きと逆方向に盤面を移動（盤面をドラッグして見たい方向へ）
+                this.targetTranslateX = this.lastPanX - deltaX;
+                this.targetTranslateY = this.lastPanY - deltaY;
                 
                 // 境界チェック
                 this.constrainPan();
