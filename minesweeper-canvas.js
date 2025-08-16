@@ -205,17 +205,23 @@ class MinesweeperCanvas {
         const boardHeight = this.rows * (this.cellSize + this.padding) + this.padding;
         const canvasRect = this.canvas.getBoundingClientRect();
         
-        // ボードがキャンバスより小さい場合でも、ある程度の移動を許可
-        const margin = 100; // 余白を設けて可動域を拡大
+        // 盤面の実際のサイズ（ズーム適用後）
+        const scaledBoardWidth = boardWidth * this.targetScale;
+        const scaledBoardHeight = boardHeight * this.targetScale;
         
-        // X軸の制限
-        const minX = canvasRect.width - boardWidth * this.targetScale - margin;
-        const maxX = margin;
+        // 画面の端に少し余裕を持たせる
+        const edgeMargin = 50;
+        
+        // X軸の制限: 盤面の右端が画面左端を超えない、左端が画面右端を超えない
+        const minX = -scaledBoardWidth + edgeMargin;  // 盤面を左に移動できる限界
+        const maxX = canvasRect.width - edgeMargin;    // 盤面を右に移動できる限界
+        
+        // Y軸の制限: 盤面の下端が画面上端を超えない、上端が画面下端を超えない
+        const minY = -scaledBoardHeight + edgeMargin;  // 盤面を上に移動できる限界
+        const maxY = canvasRect.height - edgeMargin;   // 盤面を下に移動できる限界
+        
+        // 制限を適用
         this.targetTranslateX = Math.max(minX, Math.min(maxX, this.targetTranslateX));
-        
-        // Y軸の制限
-        const minY = canvasRect.height - boardHeight * this.targetScale - margin;
-        const maxY = margin;
         this.targetTranslateY = Math.max(minY, Math.min(maxY, this.targetTranslateY));
     }
     
@@ -420,10 +426,10 @@ class MinesweeperCanvas {
             
             // スワイプ中は常にパン移動を更新
             if (this.touchMoved || distance > this.touchMoveThreshold) {
-                // 指の動きと同じ方向に視点を移動（右下から左上にスワイプ→盤面の右下を見る）
-                // 盤面を逆方向に移動させることで、視点が指の方向に移動
-                this.targetTranslateX = this.lastPanX + deltaX * 2;  // 移動量を2倍にして感度を上げる
-                this.targetTranslateY = this.lastPanY + deltaY * 2;
+                // 指の動きと逆方向に盤面を移動（スクロールのような動き）
+                // 左上にスワイプ = 盤面を左上に移動 = 右下が見える
+                this.targetTranslateX = this.lastPanX - deltaX * 1.5;  // 逆方向に移動
+                this.targetTranslateY = this.lastPanY - deltaY * 1.5;
                 
                 // 境界チェック
                 this.constrainPan();
