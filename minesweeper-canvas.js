@@ -205,23 +205,18 @@ class MinesweeperCanvas {
         const boardHeight = this.rows * (this.cellSize + this.padding) + this.padding;
         const canvasRect = this.canvas.getBoundingClientRect();
         
-        // ボードがキャンバスより小さい場合は中央に配置
-        if (boardWidth * this.targetScale <= canvasRect.width) {
-            this.targetTranslateX = (canvasRect.width - boardWidth * this.targetScale) / 2;
-        } else {
-            // ボードがキャンバスより大きい場合は境界を制限
-            const minX = canvasRect.width - boardWidth * this.targetScale;
-            const maxX = 0;
-            this.targetTranslateX = Math.max(minX, Math.min(maxX, this.targetTranslateX));
-        }
+        // ボードがキャンバスより小さい場合でも、ある程度の移動を許可
+        const margin = 100; // 余白を設けて可動域を拡大
         
-        if (boardHeight * this.targetScale <= canvasRect.height) {
-            this.targetTranslateY = (canvasRect.height - boardHeight * this.targetScale) / 2;
-        } else {
-            const minY = canvasRect.height - boardHeight * this.targetScale;
-            const maxY = 0;
-            this.targetTranslateY = Math.max(minY, Math.min(maxY, this.targetTranslateY));
-        }
+        // X軸の制限
+        const minX = canvasRect.width - boardWidth * this.targetScale - margin;
+        const maxX = margin;
+        this.targetTranslateX = Math.max(minX, Math.min(maxX, this.targetTranslateX));
+        
+        // Y軸の制限
+        const minY = canvasRect.height - boardHeight * this.targetScale - margin;
+        const maxY = margin;
+        this.targetTranslateY = Math.max(minY, Math.min(maxY, this.targetTranslateY));
     }
     
     getCellFromCoords(x, y) {
@@ -423,11 +418,12 @@ class MinesweeperCanvas {
                 }
             }
             
-            // スワイプ中は常にパン移動を更新（方向を反転）
+            // スワイプ中は常にパン移動を更新
             if (this.touchMoved || distance > this.touchMoveThreshold) {
-                // 指の動きと逆方向に盤面を移動（盤面をドラッグして見たい方向へ）
-                this.targetTranslateX = this.lastPanX - deltaX;
-                this.targetTranslateY = this.lastPanY - deltaY;
+                // 指の動きと同じ方向に視点を移動（右下から左上にスワイプ→盤面の右下を見る）
+                // 盤面を逆方向に移動させることで、視点が指の方向に移動
+                this.targetTranslateX = this.lastPanX + deltaX * 2;  // 移動量を2倍にして感度を上げる
+                this.targetTranslateY = this.lastPanY + deltaY * 2;
                 
                 // 境界チェック
                 this.constrainPan();
