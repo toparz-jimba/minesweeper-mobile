@@ -186,17 +186,17 @@ class MinesweeperCanvas {
         const newScale = Math.max(this.minScale, Math.min(this.maxScale, this.targetScale * scaleFactor));
         
         if (newScale !== this.targetScale) {
-            // ズームの中心点を計算
-            const worldX = (mouseX - this.translateX) / this.scale;
-            const worldY = (mouseY - this.translateY) / this.scale;
+            // ズームの中心点を計算（targetScaleとtargetTranslateを使用）
+            const worldX = (mouseX - this.targetTranslateX) / this.targetScale;
+            const worldY = (mouseY - this.targetTranslateY) / this.targetScale;
             
             // 新しいトランスレートを計算
             this.targetScale = newScale;
             this.targetTranslateX = mouseX - worldX * newScale;
             this.targetTranslateY = mouseY - worldY * newScale;
             
-            // 境界チェック
-            this.constrainPan();
+            // 境界チェックは緩やかに適用
+            // this.constrainPan();  // 一旦コメントアウト
         }
     }
     
@@ -469,8 +469,8 @@ class MinesweeperCanvas {
                 this.pinchCenter.x = currentCenterX;
                 this.pinchCenter.y = currentCenterY;
                 
-                // 境界チェック
-                this.constrainPan();
+                // 境界チェックは緩やかに適用
+                // this.constrainPan();  // 一旦コメントアウト
             }
         }
     }
@@ -873,6 +873,14 @@ class MinesweeperCanvas {
         this.scale += (this.targetScale - this.scale) * smoothing;
         this.translateX += (this.targetTranslateX - this.translateX) * smoothing;
         this.translateY += (this.targetTranslateY - this.translateY) * smoothing;
+        
+        // アニメーション中に緩やかに境界を適用
+        if (Math.abs(this.targetScale - this.scale) < 0.01 && 
+            Math.abs(this.targetTranslateX - this.translateX) < 1 &&
+            Math.abs(this.targetTranslateY - this.translateY) < 1) {
+            // アニメーションがほぼ完了したら境界を適用
+            this.constrainPan();
+        }
     }
     
     // 描画
