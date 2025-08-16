@@ -195,8 +195,7 @@ class MinesweeperCanvas {
             this.targetTranslateX = mouseX - worldX * newScale;
             this.targetTranslateY = mouseY - worldY * newScale;
             
-            // 境界チェックは緩やかに適用
-            // this.constrainPan();  // 一旦コメントアウト
+            // ズーム時は境界チェックをしない（ズーム中心を優先）
         }
     }
     
@@ -429,7 +428,7 @@ class MinesweeperCanvas {
                 this.targetTranslateX = this.lastPanX + deltaX * 1.5;  // 同じ方向に移動
                 this.targetTranslateY = this.lastPanY + deltaY * 1.5;
                 
-                // 境界チェック
+                // パン移動時のみ境界チェック
                 this.constrainPan();
             }
         }
@@ -469,8 +468,7 @@ class MinesweeperCanvas {
                 this.pinchCenter.x = currentCenterX;
                 this.pinchCenter.y = currentCenterY;
                 
-                // 境界チェックは緩やかに適用
-                // this.constrainPan();  // 一旦コメントアウト
+                // ピンチズーム時も境界チェックをしない
             }
         }
     }
@@ -873,14 +871,6 @@ class MinesweeperCanvas {
         this.scale += (this.targetScale - this.scale) * smoothing;
         this.translateX += (this.targetTranslateX - this.translateX) * smoothing;
         this.translateY += (this.targetTranslateY - this.translateY) * smoothing;
-        
-        // アニメーション中に緩やかに境界を適用
-        if (Math.abs(this.targetScale - this.scale) < 0.01 && 
-            Math.abs(this.targetTranslateX - this.translateX) < 1 &&
-            Math.abs(this.targetTranslateY - this.translateY) < 1) {
-            // アニメーションがほぼ完了したら境界を適用
-            this.constrainPan();
-        }
     }
     
     // 描画
