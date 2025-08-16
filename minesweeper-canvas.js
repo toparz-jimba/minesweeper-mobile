@@ -242,6 +242,16 @@ class MinesweeperCanvas {
         this.mouseX = e.clientX;
         this.mouseY = e.clientY;
         
+        // パン中の処理
+        if (this.isPanning) {
+            const deltaX = e.clientX - this.panStartX;
+            const deltaY = e.clientY - this.panStartY;
+            this.targetTranslateX = this.lastPanX + deltaX;
+            this.targetTranslateY = this.lastPanY + deltaY;
+            this.constrainPan();
+            return;
+        }
+        
         const cell = this.getCellFromCoords(e.clientX, e.clientY);
         if (cell && (!this.hoveredCell || cell.row !== this.hoveredCell.row || cell.col !== this.hoveredCell.col)) {
             this.hoveredCell = cell;
@@ -253,6 +263,17 @@ class MinesweeperCanvas {
     }
     
     handleMouseDown(e) {
+        // 中クリックまたはAltキーでパン開始
+        if (e.button === 1 || e.altKey) {
+            this.isPanning = true;
+            this.panStartX = e.clientX;
+            this.panStartY = e.clientY;
+            this.lastPanX = this.translateX;
+            this.lastPanY = this.translateY;
+            this.canvas.style.cursor = 'grabbing';
+            return;
+        }
+        
         const cell = this.getCellFromCoords(e.clientX, e.clientY);
         if (!cell || this.gameOver) return;
         
@@ -265,6 +286,13 @@ class MinesweeperCanvas {
     }
     
     handleMouseUp(e) {
+        // パン終了
+        if (this.isPanning) {
+            this.isPanning = false;
+            this.canvas.style.cursor = 'default';
+            return;
+        }
+        
         if (!this.pressedCell || this.gameOver) return;
         
         const cell = this.getCellFromCoords(e.clientX, e.clientY);
@@ -293,6 +321,7 @@ class MinesweeperCanvas {
     handleMouseLeave() {
         this.hoveredCell = null;
         this.pressedCell = null;
+        this.isPanning = false;
         this.canvas.style.cursor = 'default';
     }
     
