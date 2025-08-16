@@ -209,20 +209,28 @@ class MinesweeperCanvas {
         const scaledBoardWidth = boardWidth * this.targetScale;
         const scaledBoardHeight = boardHeight * this.targetScale;
         
-        // 画面の端に少し余裕を持たせる
-        const edgeMargin = 50;
+        // 盤面が画面より小さい場合は中央に配置、大きい場合は端までスクロール可能
+        if (scaledBoardWidth <= canvasRect.width) {
+            // 盤面が画面幅より小さい場合は中央に配置
+            this.targetTranslateX = (canvasRect.width - scaledBoardWidth) / 2;
+        } else {
+            // 盤面が画面幅より大きい場合は端までスクロール可能
+            // 左端が画面左端を超えず、右端が画面右端を超えない
+            const minX = canvasRect.width - scaledBoardWidth;  // 盤面を左に動かしすぎない
+            const maxX = 0;  // 盤面を右に動かしすぎない
+            this.targetTranslateX = Math.max(minX, Math.min(maxX, this.targetTranslateX));
+        }
         
-        // X軸の制限: 盤面の右端が画面左端を超えない、左端が画面右端を超えない
-        const minX = -scaledBoardWidth + edgeMargin;  // 盤面を左に移動できる限界
-        const maxX = canvasRect.width - edgeMargin;    // 盤面を右に移動できる限界
-        
-        // Y軸の制限: 盤面の下端が画面上端を超えない、上端が画面下端を超えない
-        const minY = -scaledBoardHeight + edgeMargin;  // 盤面を上に移動できる限界
-        const maxY = canvasRect.height - edgeMargin;   // 盤面を下に移動できる限界
-        
-        // 制限を適用
-        this.targetTranslateX = Math.max(minX, Math.min(maxX, this.targetTranslateX));
-        this.targetTranslateY = Math.max(minY, Math.min(maxY, this.targetTranslateY));
+        if (scaledBoardHeight <= canvasRect.height) {
+            // 盤面が画面高さより小さい場合は中央に配置
+            this.targetTranslateY = (canvasRect.height - scaledBoardHeight) / 2;
+        } else {
+            // 盤面が画面高さより大きい場合は端までスクロール可能
+            // 上端が画面上端を超えず、下端が画面下端を超えない
+            const minY = canvasRect.height - scaledBoardHeight;  // 盤面を上に動かしすぎない
+            const maxY = 0;  // 盤面を下に動かしすぎない
+            this.targetTranslateY = Math.max(minY, Math.min(maxY, this.targetTranslateY));
+        }
     }
     
     getCellFromCoords(x, y) {
@@ -426,10 +434,10 @@ class MinesweeperCanvas {
             
             // スワイプ中は常にパン移動を更新
             if (this.touchMoved || distance > this.touchMoveThreshold) {
-                // 指の動きと逆方向に盤面を移動（スクロールのような動き）
-                // 左上にスワイプ = 盤面を左上に移動 = 右下が見える
-                this.targetTranslateX = this.lastPanX - deltaX * 1.5;  // 逆方向に移動
-                this.targetTranslateY = this.lastPanY - deltaY * 1.5;
+                // 指の動きと同じ方向に盤面を移動（ドラッグのような動き）
+                // 左上にスワイプ = 盤面を右下に移動 = 左上が見える
+                this.targetTranslateX = this.lastPanX + deltaX * 1.5;  // 同じ方向に移動
+                this.targetTranslateY = this.lastPanY + deltaY * 1.5;
                 
                 // 境界チェック
                 this.constrainPan();
