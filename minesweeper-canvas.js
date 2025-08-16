@@ -53,7 +53,10 @@ class MinesweeperCanvas {
         // ピンチズーム用
         this.initialPinchDistance = null;
         this.initialScale = 1;
-        this.pinchCenter = null;
+        this.initialPinchCenterX = null;
+        this.initialPinchCenterY = null;
+        this.initialTranslateX = null;
+        this.initialTranslateY = null;
         
         // ズーム設定
         this.minScale = 0.5;
@@ -183,19 +186,18 @@ class MinesweeperCanvas {
         // ズーム量を計算
         const delta = e.deltaY * -0.001;
         const scaleFactor = Math.pow(1.5, delta);
-        const newScale = Math.max(this.minScale, Math.min(this.maxScale, this.targetScale * scaleFactor));
+        const oldScale = this.targetScale;
+        const newScale = Math.max(this.minScale, Math.min(this.maxScale, oldScale * scaleFactor));
         
-        if (newScale !== this.targetScale) {
-            // ズームの中心点を計算（targetScaleとtargetTranslateを使用）
-            const worldX = (mouseX - this.targetTranslateX) / this.targetScale;
-            const worldY = (mouseY - this.targetTranslateY) / this.targetScale;
+        if (newScale !== oldScale) {
+            // マウス位置を中心にズーム
+            // スケール変化の比率
+            const ratio = newScale / oldScale;
             
-            // 新しいトランスレートを計算
+            // マウス位置を基準に新しい位置を計算
             this.targetScale = newScale;
-            this.targetTranslateX = mouseX - worldX * newScale;
-            this.targetTranslateY = mouseY - worldY * newScale;
-            
-            // ズーム時は境界チェックをしない（ズーム中心を優先）
+            this.targetTranslateX = mouseX - (mouseX - this.targetTranslateX) * ratio;
+            this.targetTranslateY = mouseY - (mouseY - this.targetTranslateY) * ratio;
         }
     }
     
@@ -353,18 +355,17 @@ class MinesweeperCanvas {
                 touch2.clientX - touch.clientX,
                 touch2.clientY - touch.clientY
             );
-            this.initialScale = this.scale;
+            // ターゲット値を使用（アニメーション中の値ではなく）
+            this.initialScale = this.targetScale;
             
-            // ピンチの中心を計算
+            // ピンチの初期中心を記録
             const rect = this.canvas.getBoundingClientRect();
-            this.pinchCenter = {
-                x: ((touch.clientX + touch2.clientX) / 2) - rect.left,
-                y: ((touch.clientY + touch2.clientY) / 2) - rect.top
-            };
+            this.initialPinchCenterX = ((touch.clientX + touch2.clientX) / 2) - rect.left;
+            this.initialPinchCenterY = ((touch.clientY + touch2.clientY) / 2) - rect.top;
             
-            // 現在のパン位置を記録
-            this.lastPanX = this.translateX;
-            this.lastPanY = this.translateY;
+            // 現在のターゲット位置を記録（ピンチ開始時の基準点）
+            this.initialTranslateX = this.targetTranslateX;
+            this.initialTranslateY = this.targetTranslateY;
             
             // 2本指の時は旗を立てない
             this.pressedCell = null;
@@ -446,29 +447,24 @@ class MinesweeperCanvas {
             const currentCenterX = ((touch.clientX + touch2.clientX) / 2) - rect.left;
             const currentCenterY = ((touch.clientY + touch2.clientY) / 2) - rect.top;
             
-            if (this.initialPinchDistance && this.pinchCenter) {
+            if (this.initialPinchDistance) {
                 const scaleFactor = currentDistance / this.initialPinchDistance;
                 const newScale = Math.max(this.minScale, Math.min(this.maxScale, this.initialScale * scaleFactor));
                 
-                // ピンチ中心を基準にズーム
-                const worldX = (this.pinchCenter.x - this.lastPanX) / this.initialScale;
-                const worldY = (this.pinchCenter.y - this.lastPanY) / this.initialScale;
+                // スケール変化の比率
+                const ratio = newScale / this.initialScale;
                 
+                // 初期ピンチ中心を基準にズーム
+                // ピンチ中心が固定されたと仮定して計算
                 this.targetScale = newScale;
-                this.targetTranslateX = this.pinchCenter.x - worldX * newScale;
-                this.targetTranslateY = this.pinchCenter.y - worldY * newScale;
+                this.targetTranslateX = this.initialPinchCenterX - (this.initialPinchCenterX - this.initialTranslateX) * ratio;
+                this.targetTranslateY = this.initialPinchCenterY - (this.initialPinchCenterY - this.initialTranslateY) * ratio;
                 
-                // パン移動も同時に処理
-                const panDeltaX = currentCenterX - this.pinchCenter.x;
-                const panDeltaY = currentCenterY - this.pinchCenter.y;
-                this.targetTranslateX += panDeltaX;
-                this.targetTranslateY += panDeltaY;
-                
-                // 中心点を更新
-                this.pinchCenter.x = currentCenterX;
-                this.pinchCenter.y = currentCenterY;
-                
-                // ピンチズーム時も境界チェックをしない
+                // ピンチ中心の移動を追加（指を動かした場合のパン）
+                const centerDeltaX = currentCenterX - this.initialPinchCenterX;
+                const centerDeltaY = currentCenterY - this.initialPinchCenterY;
+                this.targetTranslateX += centerDeltaX;
+                this.targetTranslateY += centerDeltaY;
             }
         }
     }
@@ -483,7 +479,10 @@ class MinesweeperCanvas {
         
         this.isPanning = false;
         this.initialPinchDistance = null;
-        this.pinchCenter = null;
+        this.initialPinchCenterX = null;
+        this.initialPinchCenterY = null;
+        this.initialTranslateX = null;
+        this.initialTranslateY = null;
         
         // スワイプした場合は何もしない
         if (this.touchMoved) {
