@@ -333,6 +333,12 @@ class MinesweeperCanvas {
         this.touchStartY = touch.clientY;
         this.touchMoved = false;
         
+        // 1本指の場合、現在のターゲット位置を記録
+        if (e.touches.length === 1) {
+            this.lastPanX = this.targetTranslateX;
+            this.lastPanY = this.targetTranslateY;
+        }
+        
         // 2本指でのピンチズーム検出
         if (e.touches.length === 2) {
             this.isPanning = true;
@@ -401,11 +407,9 @@ class MinesweeperCanvas {
                     this.longPressTimer = null;
                 }
                 
-                // パン移動
-                this.targetTranslateX = this.translateX + deltaX;
-                this.targetTranslateY = this.translateY + deltaY;
-                this.touchStartX = touch.clientX;
-                this.touchStartY = touch.clientY;
+                // パン移動（lastPanX/Yから差分を計算）
+                this.targetTranslateX = this.lastPanX + deltaX;
+                this.targetTranslateY = this.lastPanY + deltaY;
                 
                 // 境界チェック
                 this.constrainPan();
