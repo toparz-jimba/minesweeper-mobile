@@ -51,12 +51,7 @@ class MinesweeperCanvas {
         this.lastPanY = 0;
         
         // ピンチズーム用
-        this.initialPinchDistance = null;
-        this.initialScale = 1;
-        this.initialPinchCenterX = null;
-        this.initialPinchCenterY = null;
-        this.initialTranslateX = null;
-        this.initialTranslateY = null;
+        this.lastPinchDistance = null;
         
         // ズーム設定
         this.minScale = 0.5;
@@ -351,21 +346,10 @@ class MinesweeperCanvas {
         if (e.touches.length === 2) {
             this.isPanning = true;  // 2本指の時はピンチモード
             const touch2 = e.touches[1];
-            this.initialPinchDistance = Math.hypot(
+            this.lastPinchDistance = Math.hypot(
                 touch2.clientX - touch.clientX,
                 touch2.clientY - touch.clientY
             );
-            // ターゲット値を使用（アニメーション中の値ではなく）
-            this.initialScale = this.targetScale;
-            
-            // ピンチの初期中心を記録
-            const rect = this.canvas.getBoundingClientRect();
-            this.initialPinchCenterX = ((touch.clientX + touch2.clientX) / 2) - rect.left;
-            this.initialPinchCenterY = ((touch.clientY + touch2.clientY) / 2) - rect.top;
-            
-            // 現在のターゲット位置を記録（ピンチ開始時の基準点）
-            this.initialTranslateX = this.targetTranslateX;
-            this.initialTranslateY = this.targetTranslateY;
             
             // 2本指の時は旗を立てない
             this.pressedCell = null;
@@ -442,33 +426,25 @@ class MinesweeperCanvas {
                 touch2.clientY - touch.clientY
             );
             
-            // 現在のピンチ中心
-            const rect = this.canvas.getBoundingClientRect();
-            const currentCenterX = ((touch.clientX + touch2.clientX) / 2) - rect.left;
-            const currentCenterY = ((touch.clientY + touch2.clientY) / 2) - rect.top;
-            
-            if (this.initialPinchDistance) {
-                const scaleFactor = currentDistance / this.initialPinchDistance;
-                const newScale = Math.max(this.minScale, Math.min(this.maxScale, this.initialScale * scaleFactor));
+            if (this.lastPinchDistance) {
+                // ピンチ中心を計算
+                const rect = this.canvas.getBoundingClientRect();
+                const centerX = ((touch.clientX + touch2.clientX) / 2) - rect.left;
+                const centerY = ((touch.clientY + touch2.clientY) / 2) - rect.top;
                 
-                // スケールの変化だけを適用
+                // スケール変化率（前フレームからの変化）
+                const scaleDelta = currentDistance / this.lastPinchDistance;
+                const newScale = Math.max(this.minScale, Math.min(this.maxScale, this.targetScale * scaleDelta));
+                
+                // ピンチ中心を基準にズーム（マウスホイールと同じロジック）
+                const ratio = newScale / this.targetScale;
                 this.targetScale = newScale;
-                
-                // ズームは初期ピンチ中心を基準に、パンは別途計算
-                const scaleRatio = newScale / this.initialScale;
-                
-                // 初期ピンチ中心を不動点としてズーム
-                const zoomX = this.initialPinchCenterX - (this.initialPinchCenterX - this.initialTranslateX) * scaleRatio;
-                const zoomY = this.initialPinchCenterY - (this.initialPinchCenterY - this.initialTranslateY) * scaleRatio;
-                
-                // 現在のピンチ中心の移動量を追加
-                const panX = currentCenterX - this.initialPinchCenterX;
-                const panY = currentCenterY - this.initialPinchCenterY;
-                
-                // 最終的な位置
-                this.targetTranslateX = zoomX + panX;
-                this.targetTranslateY = zoomY + panY;
+                this.targetTranslateX = centerX - (centerX - this.targetTranslateX) * ratio;
+                this.targetTranslateY = centerY - (centerY - this.targetTranslateY) * ratio;
             }
+            
+            // 次フレーム用に距離を保存
+            this.lastPinchDistance = currentDistance;
         }
     }
     
@@ -481,11 +457,7 @@ class MinesweeperCanvas {
         }
         
         this.isPanning = false;
-        this.initialPinchDistance = null;
-        this.initialPinchCenterX = null;
-        this.initialPinchCenterY = null;
-        this.initialTranslateX = null;
-        this.initialTranslateY = null;
+        this.lastPinchDistance = null;
         
         // スワイプした場合は何もしない
         if (this.touchMoved) {
