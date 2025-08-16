@@ -613,13 +613,31 @@ class Minesweeper {
             const scaleDelta = e.scale / lastScale;
             const newScale = Math.max(0.5, Math.min(3, this.scale * scaleDelta));
             
-            // ピンチの中心点を基準にスケール
-            const centerX = e.center.x;
-            const centerY = e.center.y;
-            const scaleRatio = newScale / this.scale;
+            // ピンチの中心点を取得（ビューポート座標系）
+            const viewport = document.querySelector('.board-viewport');
+            const viewportRect = viewport.getBoundingClientRect();
+            const gameBoard = document.getElementById('gameBoard');
+            const boardRect = gameBoard.getBoundingClientRect();
             
-            this.translateX = centerX - (centerX - this.translateX) * scaleRatio;
-            this.translateY = centerY - (centerY - this.translateY) * scaleRatio;
+            // ピンチ中心点（画面座標）
+            const pinchCenterX = e.center.x;
+            const pinchCenterY = e.center.y;
+            
+            // ビューポート内での相対座標
+            const relativeX = pinchCenterX - viewportRect.left;
+            const relativeY = pinchCenterY - viewportRect.top;
+            
+            // 現在のスケールと移動を考慮して、ボード上の実際の位置を計算
+            const boardX = (relativeX - this.translateX) / this.scale;
+            const boardY = (relativeY - this.translateY) / this.scale;
+            
+            // 新しいスケール後の位置
+            const newBoardX = boardX * newScale;
+            const newBoardY = boardY * newScale;
+            
+            // 必要な移動量を計算（ピンチ中心を同じ位置に保つ）
+            this.translateX = relativeX - newBoardX;
+            this.translateY = relativeY - newBoardY;
             this.scale = newScale;
             
             this.updateTransform();
