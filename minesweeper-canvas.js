@@ -39,11 +39,26 @@ class MinesweeperCanvas {
         
         // ズーム・パン用
         this.scale = 1;
+        this.targetScale = 1;
         this.translateX = 0;
         this.translateY = 0;
+        this.targetTranslateX = 0;
+        this.targetTranslateY = 0;
         this.isPanning = false;
         this.panStartX = 0;
         this.panStartY = 0;
+        this.lastPanX = 0;
+        this.lastPanY = 0;
+        
+        // ピンチズーム用
+        this.initialPinchDistance = null;
+        this.initialScale = 1;
+        this.pinchCenter = null;
+        
+        // ズーム設定
+        this.minScale = 0.5;
+        this.maxScale = 4;
+        this.smoothFactor = 0.15;
         
         // ゲーム履歴（アンドゥ用）
         this.history = [];
@@ -145,6 +160,9 @@ class MinesweeperCanvas {
         this.canvas.addEventListener('mouseleave', () => this.handleMouseLeave());
         this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
         
+        // マウスホイールズーム
+        this.canvas.addEventListener('wheel', (e) => this.handleWheel(e), { passive: false });
+        
         // タッチイベント
         this.canvas.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
         this.canvas.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: false });
@@ -153,6 +171,57 @@ class MinesweeperCanvas {
         // 既存のUIコントロール
         document.getElementById('resetBtn').addEventListener('click', () => this.resetGame());
         document.getElementById('difficultySelect').addEventListener('change', (e) => this.setDifficulty(e.target.value));
+    }
+    
+    handleWheel(e) {
+        e.preventDefault();
+        
+        const rect = this.canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        
+        // ズーム量を計算
+        const delta = e.deltaY * -0.001;
+        const scaleFactor = Math.pow(1.5, delta);
+        const newScale = Math.max(this.minScale, Math.min(this.maxScale, this.targetScale * scaleFactor));
+        
+        if (newScale !== this.targetScale) {
+            // ズームの中心点を計算
+            const worldX = (mouseX - this.translateX) / this.scale;
+            const worldY = (mouseY - this.translateY) / this.scale;
+            
+            // 新しいトランスレートを計算
+            this.targetScale = newScale;
+            this.targetTranslateX = mouseX - worldX * newScale;
+            this.targetTranslateY = mouseY - worldY * newScale;
+            
+            // 境界チェック
+            this.constrainPan();
+        }
+    }
+    
+    constrainPan() {
+        const boardWidth = this.cols * (this.cellSize + this.padding) + this.padding;
+        const boardHeight = this.rows * (this.cellSize + this.padding) + this.padding;
+        const canvasRect = this.canvas.getBoundingClientRect();
+        
+        // ボードがキャンバスより小さい場合は中央に配置
+        if (boardWidth * this.targetScale <= canvasRect.width) {
+            this.targetTranslateX = (canvasRect.width - boardWidth * this.targetScale) / 2;
+        } else {
+            // ボードがキャンバスより大きい場合は境界を制限
+            const minX = canvasRect.width - boardWidth * this.targetScale;
+            const maxX = 0;
+            this.targetTranslateX = Math.max(minX, Math.min(maxX, this.targetTranslateX));
+        }
+        
+        if (boardHeight * this.targetScale <= canvasRect.height) {
+            this.targetTranslateY = (canvasRect.height - boardHeight * this.targetScale) / 2;
+        } else {
+            const minY = canvasRect.height - boardHeight * this.targetScale;
+            const maxY = 0;
+            this.targetTranslateY = Math.max(minY, Math.min(maxY, this.targetTranslateY));
+        }
     }
     
     getCellFromCoords(x, y) {
@@ -244,6 +313,17 @@ class MinesweeperCanvas {
                 touch2.clientY - touch.clientY
             );
             this.initialScale = this.scale;
+            
+            // ピンチの中心を計算
+            const rect = this.canvas.getBoundingClientRect();
+            this.pinchCenter = {
+                x: ((touch.clientX + touch2.clientX) / 2) - rect.left,
+                y: ((touch.clientY + touch2.clientY) / 2) - rect.top
+            };
+            
+            // 現在のパン位置を記録
+            this.lastPanX = this.translateX;
+            this.lastPanY = this.translateY;
             return;
         }
         
@@ -275,26 +355,31 @@ class MinesweeperCanvas {
         e.preventDefault();
         
         const touch = e.touches[0];
-        const deltaX = touch.clientX - this.touchStartX;
-        const deltaY = touch.clientY - this.touchStartY;
-        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
         
-        // 移動距離がしきい値を超えたらスワイプと判定
-        if (distance > this.touchMoveThreshold) {
-            this.touchMoved = true;
+        // 1本指のパン移動
+        if (e.touches.length === 1 && !this.isPanning) {
+            const deltaX = touch.clientX - this.touchStartX;
+            const deltaY = touch.clientY - this.touchStartY;
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
             
-            // 長押しタイマーをキャンセル
-            if (this.longPressTimer) {
-                clearTimeout(this.longPressTimer);
-                this.longPressTimer = null;
-            }
-            
-            // パン移動
-            if (!this.isPanning && e.touches.length === 1) {
-                this.translateX += deltaX;
-                this.translateY += deltaY;
+            // 移動距離がしきい値を超えたらスワイプと判定
+            if (distance > this.touchMoveThreshold) {
+                this.touchMoved = true;
+                
+                // 長押しタイマーをキャンセル
+                if (this.longPressTimer) {
+                    clearTimeout(this.longPressTimer);
+                    this.longPressTimer = null;
+                }
+                
+                // パン移動
+                this.targetTranslateX = this.translateX + deltaX;
+                this.targetTranslateY = this.translateY + deltaY;
                 this.touchStartX = touch.clientX;
                 this.touchStartY = touch.clientY;
+                
+                // 境界チェック
+                this.constrainPan();
             }
         }
         
@@ -306,9 +391,35 @@ class MinesweeperCanvas {
                 touch2.clientY - touch.clientY
             );
             
-            if (this.initialPinchDistance) {
+            // 現在のピンチ中心
+            const rect = this.canvas.getBoundingClientRect();
+            const currentCenterX = ((touch.clientX + touch2.clientX) / 2) - rect.left;
+            const currentCenterY = ((touch.clientY + touch2.clientY) / 2) - rect.top;
+            
+            if (this.initialPinchDistance && this.pinchCenter) {
                 const scaleFactor = currentDistance / this.initialPinchDistance;
-                this.scale = Math.max(0.5, Math.min(3, this.initialScale * scaleFactor));
+                const newScale = Math.max(this.minScale, Math.min(this.maxScale, this.initialScale * scaleFactor));
+                
+                // ピンチ中心を基準にズーム
+                const worldX = (this.pinchCenter.x - this.lastPanX) / this.initialScale;
+                const worldY = (this.pinchCenter.y - this.lastPanY) / this.initialScale;
+                
+                this.targetScale = newScale;
+                this.targetTranslateX = this.pinchCenter.x - worldX * newScale;
+                this.targetTranslateY = this.pinchCenter.y - worldY * newScale;
+                
+                // パン移動も同時に処理
+                const panDeltaX = currentCenterX - this.pinchCenter.x;
+                const panDeltaY = currentCenterY - this.pinchCenter.y;
+                this.targetTranslateX += panDeltaX;
+                this.targetTranslateY += panDeltaY;
+                
+                // 中心点を更新
+                this.pinchCenter.x = currentCenterX;
+                this.pinchCenter.y = currentCenterY;
+                
+                // 境界チェック
+                this.constrainPan();
             }
         }
     }
@@ -323,6 +434,7 @@ class MinesweeperCanvas {
         
         this.isPanning = false;
         this.initialPinchDistance = null;
+        this.pinchCenter = null;
         
         // スワイプした場合は何もしない
         if (this.touchMoved) {
@@ -413,8 +525,11 @@ class MinesweeperCanvas {
         this.animations = [];
         this.history = [];
         this.scale = 1;
+        this.targetScale = 1;
         this.translateX = 0;
         this.translateY = 0;
+        this.targetTranslateX = 0;
+        this.targetTranslateY = 0;
         
         clearInterval(this.timerInterval);
         this.timerInterval = null;
@@ -701,6 +816,12 @@ class MinesweeperCanvas {
             anim.progress += deltaTime;
             return anim.progress < anim.duration;
         });
+        
+        // スムーズなズーム・パンアニメーション
+        const smoothing = this.smoothFactor;
+        this.scale += (this.targetScale - this.scale) * smoothing;
+        this.translateX += (this.targetTranslateX - this.translateX) * smoothing;
+        this.translateY += (this.targetTranslateY - this.translateY) * smoothing;
     }
     
     // 描画
