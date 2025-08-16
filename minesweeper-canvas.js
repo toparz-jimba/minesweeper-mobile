@@ -427,20 +427,13 @@ class MinesweeperCanvas {
             );
             
             if (this.lastPinchDistance) {
-                // ピンチ中心を計算
-                const rect = this.canvas.getBoundingClientRect();
-                const centerX = ((touch.clientX + touch2.clientX) / 2) - rect.left;
-                const centerY = ((touch.clientY + touch2.clientY) / 2) - rect.top;
-                
                 // スケール変化率（前フレームからの変化）
                 const scaleDelta = currentDistance / this.lastPinchDistance;
                 const newScale = Math.max(this.minScale, Math.min(this.maxScale, this.targetScale * scaleDelta));
                 
-                // ピンチ中心を基準にズーム（マウスホイールと同じロジック）
-                const ratio = newScale / this.targetScale;
+                // スケールだけを変更（位置は動かさない）
                 this.targetScale = newScale;
-                this.targetTranslateX = centerX - (centerX - this.targetTranslateX) * ratio;
-                this.targetTranslateY = centerY - (centerY - this.targetTranslateY) * ratio;
+                // this.targetTranslateX と this.targetTranslateY は変更しない
             }
             
             // 次フレーム用に距離を保存
