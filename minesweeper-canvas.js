@@ -268,7 +268,7 @@ class MinesweeperCanvas {
                     navigator.vibrate([20, 10, 20]);
                 }
             }
-        }, 400); // 400msに延長
+        }, 300); // 300msに変更
     }
     
     handleTouchMove(e) {
