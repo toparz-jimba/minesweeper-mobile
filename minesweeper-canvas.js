@@ -35,7 +35,7 @@ class MinesweeperCanvas {
         this.touchStartX = 0;
         this.touchStartY = 0;
         this.touchMoved = false;
-        this.touchMoveThreshold = 10; // 10px以上動いたらスワイプと判定
+        this.touchMoveThreshold = 5; // 5px以上動いたらスワイプと判定
         
         // ズーム・パン用
         this.scale = 1;
@@ -365,25 +365,26 @@ class MinesweeperCanvas {
         if (this.gameOver) return;
         
         const cell = this.getCellFromCoords(touch.clientX, touch.clientY);
-        if (!cell) return;
-        
-        this.pressedCell = cell;
-        
-        // 長押し検出（旗を立てる）
-        this.longPressTimer = setTimeout(() => {
-            if (this.pressedCell && 
-                this.pressedCell.row === cell.row && 
-                this.pressedCell.col === cell.col &&
-                !this.touchMoved) {
-                this.toggleFlag(cell.row, cell.col);
-                this.pressedCell = null;
-                
-                // 振動フィードバック
-                if (navigator.vibrate) {
-                    navigator.vibrate([20, 10, 20]);
+        // セルが存在してもしなくても、パン移動のために処理を続ける
+        if (cell) {
+            this.pressedCell = cell;
+            
+            // 長押し検出（旗を立てる）
+            this.longPressTimer = setTimeout(() => {
+                if (this.pressedCell && 
+                    this.pressedCell.row === cell.row && 
+                    this.pressedCell.col === cell.col &&
+                    !this.touchMoved) {
+                    this.toggleFlag(cell.row, cell.col);
+                    this.pressedCell = null;
+                    
+                    // 振動フィードバック
+                    if (navigator.vibrate) {
+                        navigator.vibrate([20, 10, 20]);
+                    }
                 }
-            }
-        }, 300); // 300msに変更
+            }, 300); // 300msに変更
+        }
     }
     
     handleTouchMove(e) {
@@ -397,8 +398,8 @@ class MinesweeperCanvas {
             const deltaY = touch.clientY - this.touchStartY;
             const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
             
-            // 移動距離がしきい値を超えたらスワイプと判定
-            if (distance > this.touchMoveThreshold) {
+            // スワイプ判定とパン移動
+            if (!this.touchMoved && distance > this.touchMoveThreshold) {
                 this.touchMoved = true;
                 
                 // 長押しタイマーをキャンセル
@@ -406,8 +407,10 @@ class MinesweeperCanvas {
                     clearTimeout(this.longPressTimer);
                     this.longPressTimer = null;
                 }
-                
-                // パン移動（lastPanX/Yから差分を計算）
+            }
+            
+            // スワイプ中は常にパン移動を更新
+            if (this.touchMoved || distance > this.touchMoveThreshold) {
                 this.targetTranslateX = this.lastPanX + deltaX;
                 this.targetTranslateY = this.lastPanY + deltaY;
                 
