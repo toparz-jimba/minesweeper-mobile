@@ -10,6 +10,7 @@
     <meta name="format-detection" content="telephone=no">
     <title>マインスイーパー</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="effects.css">
 </head>
 <body>
     <div class="ui-container">
@@ -26,6 +27,14 @@
                     <option value="backHard">裏上級 (16×30)</option>
                     <option value="extreme">極悪 (64×64)</option>
                 </select>
+                
+                <select id="themeSelect" class="theme-select" onchange="minesweeperGame.setTheme(this.value)">
+                    <option value="dark">ダーク</option>
+                    <option value="light">ライト</option>
+                    <option value="neon">ネオン</option>
+                </select>
+                
+                <button id="soundToggle" class="sound-toggle" onclick="this.textContent = soundManager.toggle() ? '🔊' : '🔇'" title="サウンド切り替え">🔊</button>
             </div>
             
             <div class="game-info">
@@ -42,6 +51,9 @@
                     <span class="label">⏱</span>
                     <span id="timer">0</span>
                 </div>
+                <button id="undoBtn" class="undo-btn" onclick="minesweeperGame.undo()" disabled>
+                    ↩️ 戻す
+                </button>
                 <button id="resetBtn" class="reset-btn">リセット 😊</button>
             </div>
         </header>
@@ -54,6 +66,8 @@
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+    <script src="soundManager.js"></script>
+    <script src="particleSystem.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

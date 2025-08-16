@@ -18,6 +18,24 @@ class Minesweeper {
         this.translateY = 0;
         this.hammerManager = null;
         
+        // ゲーム履歴（アンドゥ用）
+        this.history = [];
+        this.maxHistory = 10;
+        
+        // 現在のテーマ
+        this.currentTheme = 'dark';
+        
+        // 振動フィードバックの強度
+        this.hapticPatterns = {
+            reveal: [10],
+            flag: [20, 10, 20],
+            unflag: [10, 5, 10],
+            explode: [100, 50, 100, 50, 200],
+            win: [50, 30, 50, 30, 50, 30, 100],
+            error: [30, 20, 30],
+            chain: [5, 5, 5, 5, 10]
+        };
+        
         this.init();
     }
     
@@ -142,43 +160,54 @@ class Minesweeper {
     }
     
     renderBoard() {
-        const gameBoard = document.getElementById('gameBoard');
-        gameBoard.innerHTML = '';
-        gameBoard.className = 'game-board';
-        
-        if (this.gameOver) {
-            gameBoard.classList.add('game-over');
-        }
-        
-        const cellSize = '35px';
-        gameBoard.style.gridTemplateColumns = `repeat(${this.cols}, ${cellSize})`;
-        gameBoard.style.gridTemplateRows = `repeat(${this.rows}, ${cellSize})`;
-        
-        for (let i = 0; i < this.rows; i++) {
-            for (let j = 0; j < this.cols; j++) {
-                const cell = document.createElement('div');
-                cell.className = 'cell';
-                cell.dataset.row = i;
-                cell.dataset.col = j;
-                
-                const cellData = this.board[i][j];
-                
-                if (cellData.isRevealed) {
-                    cell.classList.add('revealed');
-                    if (cellData.isMine) {
-                        cell.classList.add('mine');
-                    } else if (cellData.neighborMines > 0) {
-                        cell.textContent = cellData.neighborMines;
-                        cell.dataset.count = cellData.neighborMines;
-                    }
-                } else if (cellData.isFlagged) {
-                    cell.classList.add('flagged');
-                }
-                
-                this.setupCellEventListeners(cell, i, j);
-                gameBoard.appendChild(cell);
+        // requestAnimationFrameを使用してレンダリングを最適化
+        requestAnimationFrame(() => {
+            const gameBoard = document.getElementById('gameBoard');
+            
+            // DocumentFragmentを使用してDOM操作を最適化
+            const fragment = document.createDocumentFragment();
+            
+            gameBoard.innerHTML = '';
+            gameBoard.className = 'game-board';
+            
+            if (this.gameOver) {
+                gameBoard.classList.add('game-over');
             }
-        }
+            
+            const cellSize = '35px';
+            gameBoard.style.gridTemplateColumns = `repeat(${this.cols}, ${cellSize})`;
+            gameBoard.style.gridTemplateRows = `repeat(${this.rows}, ${cellSize})`;
+            
+            // バッチ処理でセルを作成
+            for (let i = 0; i < this.rows; i++) {
+                for (let j = 0; j < this.cols; j++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+                    
+                    const cellData = this.board[i][j];
+                    
+                    if (cellData.isRevealed) {
+                        cell.classList.add('revealed');
+                        if (cellData.isMine) {
+                            cell.classList.add('mine');
+                        } else if (cellData.neighborMines > 0) {
+                            cell.textContent = cellData.neighborMines;
+                            cell.dataset.count = cellData.neighborMines;
+                        }
+                    } else if (cellData.isFlagged) {
+                        cell.classList.add('flagged');
+                    }
+                    
+                    this.setupCellEventListeners(cell, i, j);
+                    fragment.appendChild(cell);
+                }
+            }
+            
+            // 一度にすべてのセルを追加
+            gameBoard.appendChild(fragment);
+        });
     }
     
     setupCellEventListeners(cell, row, col) {
@@ -206,7 +235,8 @@ class Minesweeper {
             recognizers: [
                 [Hammer.Tap, { event: 'singletap' }],
                 [Hammer.Tap, { event: 'doubletap', taps: 2 }],
-                [Hammer.Press, { time: 170 }]
+                [Hammer.Press, { time: 170 }],
+                [Hammer.Swipe, { direction: Hammer.DIRECTION_ALL, threshold: 10, velocity: 0.3 }]
             ]
         });
         
@@ -249,6 +279,17 @@ class Minesweeper {
                 navigator.vibrate([50, 30, 50]);
             }
         });
+        
+        // スワイプ（素早く旗を立てる）
+        hammer.on('swipe', (e) => {
+            // パン操作中は無視
+            if (isPanning) return;
+            
+            // 上スワイプで旗を立てる
+            if (e.direction === Hammer.DIRECTION_UP) {
+                this.handleRightClick(row, col);
+            }
+        });
     }
     
     handleLeftClick(row, col) {
@@ -278,13 +319,53 @@ class Minesweeper {
         
         if (cell.isRevealed) return;
         
+        this.saveHistory();
+        
+        const cellElement = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+        
         if (cell.isFlagged) {
             cell.isFlagged = false;
             this.flagCount--;
+            
+            // アンフラグエフェクト
+            if (typeof soundManager !== 'undefined') {
+                soundManager.sounds.unflag();
+            }
+            if (navigator.vibrate) {
+                navigator.vibrate(this.hapticPatterns.unflag);
+            }
         } else {
             if (this.flagCount < this.mines) {
                 cell.isFlagged = true;
                 this.flagCount++;
+                
+                // フラグエフェクト
+                if (cellElement) {
+                    cellElement.classList.add('flag-animation');
+                    if (typeof particleSystem !== 'undefined') {
+                        particleSystem.flagEffect(cellElement);
+                    }
+                }
+                if (typeof soundManager !== 'undefined') {
+                    soundManager.sounds.flag();
+                }
+                if (navigator.vibrate) {
+                    navigator.vibrate(this.hapticPatterns.flag);
+                }
+            } else {
+                // フラグ上限エラー
+                const gameBoard = document.getElementById('gameBoard');
+                gameBoard.classList.add('error-shake');
+                setTimeout(() => {
+                    gameBoard.classList.remove('error-shake');
+                }, 300);
+                
+                if (typeof soundManager !== 'undefined') {
+                    soundManager.sounds.error();
+                }
+                if (navigator.vibrate) {
+                    navigator.vibrate(this.hapticPatterns.error);
+                }
             }
         }
         
@@ -352,23 +433,71 @@ class Minesweeper {
         }
     }
     
-    revealCell(row, col) {
+    revealCell(row, col, isChain = false, chainDelay = 0) {
         if (!this.isValidCell(row, col)) return;
         
         const cell = this.board[row][col];
         
         if (cell.isRevealed || cell.isFlagged) return;
         
+        // 履歴を保存（チェーン開示の最初のみ）
+        if (!isChain) {
+            this.saveHistory();
+        }
+        
         cell.isRevealed = true;
         this.revealedCount++;
         
+        // アニメーションとエフェクト
+        const cellElement = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+        if (cellElement) {
+            if (isChain) {
+                cellElement.style.setProperty('--ripple-delay', chainDelay);
+                cellElement.classList.add('ripple-reveal');
+                
+                // 連鎖音
+                setTimeout(() => {
+                    if (typeof soundManager !== 'undefined') {
+                        soundManager.sounds.chain(chainDelay);
+                    }
+                }, chainDelay * 20);
+            } else {
+                cellElement.classList.add('reveal-animation');
+                if (typeof soundManager !== 'undefined') {
+                    soundManager.sounds.reveal();
+                }
+                if (typeof particleSystem !== 'undefined') {
+                    particleSystem.revealEffect(cellElement);
+                }
+            }
+            
+            // 振動フィードバック
+            if (navigator.vibrate) {
+                navigator.vibrate(this.hapticPatterns.reveal);
+            }
+        }
+        
         if (!cell.isMine && cell.neighborMines === 0) {
+            const neighbors = [];
             for (let dr = -1; dr <= 1; dr++) {
                 for (let dc = -1; dc <= 1; dc++) {
                     if (dr === 0 && dc === 0) continue;
-                    this.revealCell(row + dr, col + dc);
+                    const newRow = row + dr;
+                    const newCol = col + dc;
+                    if (this.isValidCell(newRow, newCol) && 
+                        !this.board[newRow][newCol].isRevealed && 
+                        !this.board[newRow][newCol].isFlagged) {
+                        neighbors.push({row: newRow, col: newCol});
+                    }
                 }
             }
+            
+            // 波紋効果で連鎖開示
+            neighbors.forEach((neighbor, index) => {
+                setTimeout(() => {
+                    this.revealCell(neighbor.row, neighbor.col, true, index + 1);
+                }, index * 30);
+            });
         }
         
         this.renderBoard();
@@ -394,22 +523,70 @@ class Minesweeper {
         
         if (won) {
             document.getElementById('resetBtn').textContent = 'リセット 😎';
-            alert('おめでとう！クリアしました！');
+            
+            // 勝利エフェクト
+            const gameBoard = document.getElementById('gameBoard');
+            gameBoard.classList.add('win-animation');
+            
+            // セルに遅延を設定
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach((cell, index) => {
+                cell.style.setProperty('--win-delay', index);
+            });
+            
+            if (typeof soundManager !== 'undefined') {
+                soundManager.sounds.win();
+            }
+            if (typeof particleSystem !== 'undefined') {
+                particleSystem.winCelebration();
+            }
+            if (navigator.vibrate) {
+                navigator.vibrate(this.hapticPatterns.win);
+            }
+            
+            // よりスタイリッシュな勝利メッセージ
+            setTimeout(() => {
+                this.showMessage('🎉 クリア！ 🎉', 'success');
+            }, 500);
         } else {
             document.getElementById('resetBtn').textContent = 'リセット 😵';
+            
+            // 爆発エフェクト
+            if (typeof soundManager !== 'undefined') {
+                soundManager.sounds.explode();
+            }
+            if (navigator.vibrate) {
+                navigator.vibrate(this.hapticPatterns.explode);
+            }
+            
             this.revealAllMines();
         }
     }
     
     revealAllMines() {
+        const mines = [];
         for (let i = 0; i < this.rows; i++) {
             for (let j = 0; j < this.cols; j++) {
                 if (this.board[i][j].isMine) {
-                    this.board[i][j].isRevealed = true;
+                    mines.push({row: i, col: j});
                 }
             }
         }
-        this.renderBoard();
+        
+        // 順番に地雷を表示
+        mines.forEach((mine, index) => {
+            setTimeout(() => {
+                this.board[mine.row][mine.col].isRevealed = true;
+                const cellElement = document.querySelector(`[data-row="${mine.row}"][data-col="${mine.col}"]`);
+                if (cellElement) {
+                    cellElement.classList.add('mine-explode');
+                    if (typeof particleSystem !== 'undefined' && index < 5) { // 最初の5個だけエフェクト
+                        particleSystem.explodeEffect(cellElement);
+                    }
+                }
+                this.renderBoard();
+            }, index * 50);
+        });
     }
     
     startTimer() {
@@ -561,8 +738,118 @@ class Minesweeper {
         this.translateY = 0;
         this.updateTransform();
     }
+    
+    // 履歴保存（アンドゥ用）
+    saveHistory() {
+        const state = {
+            board: JSON.parse(JSON.stringify(this.board)),
+            flagCount: this.flagCount,
+            revealedCount: this.revealedCount,
+            timer: this.timer
+        };
+        
+        this.history.push(state);
+        if (this.history.length > this.maxHistory) {
+            this.history.shift();
+        }
+        
+        // アンドゥボタンの状態を更新
+        const undoBtn = document.getElementById('undoBtn');
+        if (undoBtn) {
+            undoBtn.disabled = false;
+        }
+    }
+    
+    // アンドゥ実行
+    undo() {
+        if (this.history.length === 0 || this.gameOver) return;
+        
+        const state = this.history.pop();
+        this.board = state.board;
+        this.flagCount = state.flagCount;
+        this.revealedCount = state.revealedCount;
+        
+        // UI更新
+        document.getElementById('mineCount').textContent = this.mines - this.flagCount;
+        document.getElementById('flagCount').textContent = this.flagCount;
+        
+        // アンドゥボタンの状態を更新
+        const undoBtn = document.getElementById('undoBtn');
+        if (undoBtn && this.history.length === 0) {
+            undoBtn.disabled = true;
+        }
+        
+        // サウンド再生
+        if (typeof soundManager !== 'undefined') {
+            soundManager.sounds.click();
+        }
+        
+        this.renderBoard();
+    }
+    
+    // テーマ切り替え
+    setTheme(theme) {
+        document.body.className = '';
+        document.body.classList.add(`theme-${theme}`);
+        this.currentTheme = theme;
+        localStorage.setItem('minesweeper-theme', theme);
+        
+        // テーマ切り替えサウンド
+        if (typeof soundManager !== 'undefined') {
+            soundManager.sounds.click();
+        }
+    }
+    
+    // 初期テーマ設定
+    loadTheme() {
+        const savedTheme = localStorage.getItem('minesweeper-theme') || 'dark';
+        this.setTheme(savedTheme);
+    }
+    
+    // メッセージ表示
+    showMessage(text, type = 'info') {
+        const messageEl = document.createElement('div');
+        messageEl.className = `game-message ${type}`;
+        messageEl.textContent = text;
+        messageEl.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: ${type === 'success' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#333'};
+            color: white;
+            padding: 20px 40px;
+            border-radius: 10px;
+            font-size: 24px;
+            font-weight: bold;
+            z-index: 10000;
+            animation: fadeInOut 2s ease-in-out;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        `;
+        
+        // アニメーション用のスタイル追加
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes fadeInOut {
+                0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+                20% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+                80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+                100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        document.body.appendChild(messageEl);
+        
+        setTimeout(() => {
+            messageEl.remove();
+            style.remove();
+        }, 2000);
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    new Minesweeper();
+    const game = new Minesweeper();
+    game.loadTheme();
+    window.minesweeperGame = game; // グローバルアクセス用
 });
