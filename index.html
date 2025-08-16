@@ -28,7 +28,7 @@
                     <option value="extreme">極悪 (64×64)</option>
                 </select>
                 
-                <select id="themeSelect" class="theme-select" onchange="minesweeperGame.setTheme(this.value)">
+                <select id="themeSelect" class="theme-select" onchange="if(window.minesweeperCanvasGame) minesweeperCanvasGame.setTheme(this.value); else minesweeperGame.setTheme(this.value)">
                     <option value="dark">ダーク</option>
                     <option value="light">ライト</option>
                     <option value="neon">ネオン</option>
@@ -51,7 +51,7 @@
                     <span class="label">⏱</span>
                     <span id="timer">0</span>
                 </div>
-                <button id="undoBtn" class="undo-btn" onclick="minesweeperGame.undo()" disabled>
+                <button id="undoBtn" class="undo-btn" onclick="if(window.minesweeperCanvasGame) minesweeperCanvasGame.undo(); else minesweeperGame.undo()" disabled>
                     ↩️ 戻す
                 </button>
                 <button id="resetBtn" class="reset-btn">リセット 😊</button>
@@ -68,6 +68,7 @@
     <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
     <script src="soundManager.js"></script>
     <script src="particleSystem.js"></script>
-    <script src="script.js"></script>
+    <!-- <script src="script.js"></script> -->
+    <script src="minesweeper-canvas.js"></script>
 </body>
 </html>

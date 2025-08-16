@@ -160,54 +160,51 @@ class Minesweeper {
     }
     
     renderBoard() {
-        // requestAnimationFrameを使用してレンダリングを最適化
-        requestAnimationFrame(() => {
-            const gameBoard = document.getElementById('gameBoard');
-            
-            // DocumentFragmentを使用してDOM操作を最適化
-            const fragment = document.createDocumentFragment();
-            
-            gameBoard.innerHTML = '';
-            gameBoard.className = 'game-board';
-            
-            if (this.gameOver) {
-                gameBoard.classList.add('game-over');
-            }
-            
-            const cellSize = '35px';
-            gameBoard.style.gridTemplateColumns = `repeat(${this.cols}, ${cellSize})`;
-            gameBoard.style.gridTemplateRows = `repeat(${this.rows}, ${cellSize})`;
-            
-            // バッチ処理でセルを作成
-            for (let i = 0; i < this.rows; i++) {
-                for (let j = 0; j < this.cols; j++) {
-                    const cell = document.createElement('div');
-                    cell.className = 'cell';
-                    cell.dataset.row = i;
-                    cell.dataset.col = j;
-                    
-                    const cellData = this.board[i][j];
-                    
-                    if (cellData.isRevealed) {
-                        cell.classList.add('revealed');
-                        if (cellData.isMine) {
-                            cell.classList.add('mine');
-                        } else if (cellData.neighborMines > 0) {
-                            cell.textContent = cellData.neighborMines;
-                            cell.dataset.count = cellData.neighborMines;
-                        }
-                    } else if (cellData.isFlagged) {
-                        cell.classList.add('flagged');
+        const gameBoard = document.getElementById('gameBoard');
+        
+        // DocumentFragmentを使用してDOM操作を最適化
+        const fragment = document.createDocumentFragment();
+        
+        gameBoard.innerHTML = '';
+        gameBoard.className = 'game-board';
+        
+        if (this.gameOver) {
+            gameBoard.classList.add('game-over');
+        }
+        
+        const cellSize = '35px';
+        gameBoard.style.gridTemplateColumns = `repeat(${this.cols}, ${cellSize})`;
+        gameBoard.style.gridTemplateRows = `repeat(${this.rows}, ${cellSize})`;
+        
+        // バッチ処理でセルを作成
+        for (let i = 0; i < this.rows; i++) {
+            for (let j = 0; j < this.cols; j++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.dataset.row = i;
+                cell.dataset.col = j;
+                
+                const cellData = this.board[i][j];
+                
+                if (cellData.isRevealed) {
+                    cell.classList.add('revealed');
+                    if (cellData.isMine) {
+                        cell.classList.add('mine');
+                    } else if (cellData.neighborMines > 0) {
+                        cell.textContent = cellData.neighborMines;
+                        cell.dataset.count = cellData.neighborMines;
                     }
-                    
-                    this.setupCellEventListeners(cell, i, j);
-                    fragment.appendChild(cell);
+                } else if (cellData.isFlagged) {
+                    cell.classList.add('flagged');
                 }
+                
+                this.setupCellEventListeners(cell, i, j);
+                fragment.appendChild(cell);
             }
-            
-            // 一度にすべてのセルを追加
-            gameBoard.appendChild(fragment);
-        });
+        }
+        
+        // 一度にすべてのセルを追加
+        gameBoard.appendChild(fragment);
     }
     
     setupCellEventListeners(cell, row, col) {
@@ -443,42 +440,15 @@ class Minesweeper {
         // 履歴を保存（チェーン開示の最初のみ）
         if (!isChain) {
             this.saveHistory();
+            this.chainRevealQueue = [];
+            this.isChainRevealing = false;
         }
         
         cell.isRevealed = true;
         this.revealedCount++;
         
-        // アニメーションとエフェクト
-        const cellElement = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
-        if (cellElement) {
-            if (isChain) {
-                cellElement.style.setProperty('--ripple-delay', chainDelay);
-                cellElement.classList.add('ripple-reveal');
-                
-                // 連鎖音
-                setTimeout(() => {
-                    if (typeof soundManager !== 'undefined') {
-                        soundManager.sounds.chain(chainDelay);
-                    }
-                }, chainDelay * 20);
-            } else {
-                cellElement.classList.add('reveal-animation');
-                if (typeof soundManager !== 'undefined') {
-                    soundManager.sounds.reveal();
-                }
-                if (typeof particleSystem !== 'undefined') {
-                    particleSystem.revealEffect(cellElement);
-                }
-            }
-            
-            // 振動フィードバック
-            if (navigator.vibrate) {
-                navigator.vibrate(this.hapticPatterns.reveal);
-            }
-        }
-        
+        // 空のセルの場合、隣接セルを収集
         if (!cell.isMine && cell.neighborMines === 0) {
-            const neighbors = [];
             for (let dr = -1; dr <= 1; dr++) {
                 for (let dc = -1; dc <= 1; dc++) {
                     if (dr === 0 && dc === 0) continue;
@@ -487,20 +457,34 @@ class Minesweeper {
                     if (this.isValidCell(newRow, newCol) && 
                         !this.board[newRow][newCol].isRevealed && 
                         !this.board[newRow][newCol].isFlagged) {
-                        neighbors.push({row: newRow, col: newCol});
+                        this.revealCell(newRow, newCol, true);
                     }
                 }
             }
-            
-            // 波紋効果で連鎖開示
-            neighbors.forEach((neighbor, index) => {
-                setTimeout(() => {
-                    this.revealCell(neighbor.row, neighbor.col, true, index + 1);
-                }, index * 30);
-            });
         }
         
-        this.renderBoard();
+        // バッチレンダリング（連鎖開示の最後にまとめて実行）
+        if (!isChain) {
+            this.renderBoard();
+            this.applyRevealAnimations();
+        }
+    }
+    
+    // アニメーションを後から適用
+    applyRevealAnimations() {
+        // 新しく開いたセルだけにアニメーションを適用
+        // （すでに開いているセルには影響しない）
+        requestAnimationFrame(() => {
+            // 音は最初の1回だけ
+            if (typeof soundManager !== 'undefined') {
+                soundManager.sounds.reveal();
+            }
+            
+            // 振動は1回だけ
+            if (navigator.vibrate) {
+                navigator.vibrate(this.hapticPatterns.reveal);
+            }
+        });
     }
     
     isValidCell(row, col) {
@@ -564,28 +548,27 @@ class Minesweeper {
     }
     
     revealAllMines() {
-        const mines = [];
+        // すべての地雷を一度に表示
         for (let i = 0; i < this.rows; i++) {
             for (let j = 0; j < this.cols; j++) {
                 if (this.board[i][j].isMine) {
-                    mines.push({row: i, col: j});
+                    this.board[i][j].isRevealed = true;
                 }
             }
         }
         
-        // 順番に地雷を表示
-        mines.forEach((mine, index) => {
-            setTimeout(() => {
-                this.board[mine.row][mine.col].isRevealed = true;
-                const cellElement = document.querySelector(`[data-row="${mine.row}"][data-col="${mine.col}"]`);
-                if (cellElement) {
-                    cellElement.classList.add('mine-explode');
-                    if (typeof particleSystem !== 'undefined' && index < 5) { // 最初の5個だけエフェクト
-                        particleSystem.explodeEffect(cellElement);
-                    }
+        this.renderBoard();
+        
+        // アニメーションを後から適用
+        requestAnimationFrame(() => {
+            const mineCells = document.querySelectorAll('.cell.mine');
+            mineCells.forEach((cell, index) => {
+                cell.classList.add('mine-explode');
+                // 最初の3個だけパーティクルエフェクト
+                if (typeof particleSystem !== 'undefined' && index < 3) {
+                    particleSystem.explodeEffect(cell);
                 }
-                this.renderBoard();
-            }, index * 50);
+            });
         });
     }
     
