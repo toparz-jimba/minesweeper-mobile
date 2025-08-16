@@ -31,6 +31,20 @@ class MinesweeperCanvas {
         this.lastClickCell = null;
         this.doubleClickDelay = 300;
         
+        // タッチ移動検出
+        this.touchStartX = 0;
+        this.touchStartY = 0;
+        this.touchMoved = false;
+        this.touchMoveThreshold = 10; // 10px以上動いたらスワイプと判定
+        
+        // ズーム・パン用
+        this.scale = 1;
+        this.translateX = 0;
+        this.translateY = 0;
+        this.isPanning = false;
+        this.panStartX = 0;
+        this.panStartY = 0;
+        
         // ゲーム履歴（アンドゥ用）
         this.history = [];
         this.maxHistory = 10;
@@ -143,8 +157,8 @@ class MinesweeperCanvas {
     
     getCellFromCoords(x, y) {
         const rect = this.canvas.getBoundingClientRect();
-        const canvasX = x - rect.left;
-        const canvasY = y - rect.top;
+        const canvasX = (x - rect.left - this.translateX) / this.scale;
+        const canvasY = (y - rect.top - this.translateY) / this.scale;
         
         const col = Math.floor(canvasX / (this.cellSize + this.padding));
         const row = Math.floor(canvasY / (this.cellSize + this.padding));
@@ -215,9 +229,26 @@ class MinesweeperCanvas {
     
     handleTouchStart(e) {
         e.preventDefault();
-        if (this.gameOver) return;
         
         const touch = e.touches[0];
+        this.touchStartX = touch.clientX;
+        this.touchStartY = touch.clientY;
+        this.touchMoved = false;
+        
+        // 2本指でのピンチズーム検出
+        if (e.touches.length === 2) {
+            this.isPanning = true;
+            const touch2 = e.touches[1];
+            this.initialPinchDistance = Math.hypot(
+                touch2.clientX - touch.clientX,
+                touch2.clientY - touch.clientY
+            );
+            this.initialScale = this.scale;
+            return;
+        }
+        
+        if (this.gameOver) return;
+        
         const cell = this.getCellFromCoords(touch.clientX, touch.clientY);
         if (!cell) return;
         
@@ -227,7 +258,8 @@ class MinesweeperCanvas {
         this.longPressTimer = setTimeout(() => {
             if (this.pressedCell && 
                 this.pressedCell.row === cell.row && 
-                this.pressedCell.col === cell.col) {
+                this.pressedCell.col === cell.col &&
+                !this.touchMoved) {
                 this.toggleFlag(cell.row, cell.col);
                 this.pressedCell = null;
                 
@@ -236,22 +268,47 @@ class MinesweeperCanvas {
                     navigator.vibrate([20, 10, 20]);
                 }
             }
-        }, 300);
+        }, 400); // 400msに延長
     }
     
     handleTouchMove(e) {
         e.preventDefault();
         
-        if (this.longPressTimer) {
-            const touch = e.touches[0];
-            const cell = this.getCellFromCoords(touch.clientX, touch.clientY);
+        const touch = e.touches[0];
+        const deltaX = touch.clientX - this.touchStartX;
+        const deltaY = touch.clientY - this.touchStartY;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        
+        // 移動距離がしきい値を超えたらスワイプと判定
+        if (distance > this.touchMoveThreshold) {
+            this.touchMoved = true;
             
-            // 指が元のセルから離れたら長押しをキャンセル
-            if (!cell || !this.pressedCell ||
-                cell.row !== this.pressedCell.row || 
-                cell.col !== this.pressedCell.col) {
+            // 長押しタイマーをキャンセル
+            if (this.longPressTimer) {
                 clearTimeout(this.longPressTimer);
                 this.longPressTimer = null;
+            }
+            
+            // パン移動
+            if (!this.isPanning && e.touches.length === 1) {
+                this.translateX += deltaX;
+                this.translateY += deltaY;
+                this.touchStartX = touch.clientX;
+                this.touchStartY = touch.clientY;
+            }
+        }
+        
+        // ピンチズーム処理
+        if (e.touches.length === 2) {
+            const touch2 = e.touches[1];
+            const currentDistance = Math.hypot(
+                touch2.clientX - touch.clientX,
+                touch2.clientY - touch.clientY
+            );
+            
+            if (this.initialPinchDistance) {
+                const scaleFactor = currentDistance / this.initialPinchDistance;
+                this.scale = Math.max(0.5, Math.min(3, this.initialScale * scaleFactor));
             }
         }
     }
@@ -264,8 +321,17 @@ class MinesweeperCanvas {
             this.longPressTimer = null;
         }
         
+        this.isPanning = false;
+        this.initialPinchDistance = null;
+        
+        // スワイプした場合は何もしない
+        if (this.touchMoved) {
+            this.pressedCell = null;
+            return;
+        }
+        
         // 長押しでない場合はセルを開く
-        if (this.pressedCell) {
+        if (this.pressedCell && !this.touchMoved) {
             const currentTime = Date.now();
             const cell = this.pressedCell;
             
@@ -283,9 +349,9 @@ class MinesweeperCanvas {
                 this.lastClickCell = cell;
                 this.lastClickTime = currentTime;
             }
-            
-            this.pressedCell = null;
         }
+        
+        this.pressedCell = null;
     }
     
     setDifficulty(level) {
@@ -346,6 +412,9 @@ class MinesweeperCanvas {
         this.timer = 0;
         this.animations = [];
         this.history = [];
+        this.scale = 1;
+        this.translateX = 0;
+        this.translateY = 0;
         
         clearInterval(this.timerInterval);
         this.timerInterval = null;
@@ -653,9 +722,22 @@ class MinesweeperCanvas {
         const ctx = this.ctx;
         const theme = this.theme;
         
-        // 背景をクリア
+        // キャンバス全体をクリア
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.restore();
+        
+        // 変換行列を適用（ズーム・パン）
+        ctx.save();
+        ctx.translate(this.translateX, this.translateY);
+        ctx.scale(this.scale, this.scale);
+        
+        // 背景を描画
+        const boardWidth = this.cols * (this.cellSize + this.padding) + this.padding;
+        const boardHeight = this.rows * (this.cellSize + this.padding) + this.padding;
         ctx.fillStyle = theme.boardBg;
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, boardWidth, boardHeight);
         
         // セルを描画
         for (let row = 0; row < this.rows; row++) {
@@ -663,6 +745,8 @@ class MinesweeperCanvas {
                 this.renderCell(row, col);
             }
         }
+        
+        ctx.restore();
     }
     
     renderCell(row, col) {
